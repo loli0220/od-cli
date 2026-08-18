@@ -441,14 +441,14 @@ impl OneDriveClient {
         threads: usize,
     ) -> Result<DriveItem> {
         if !local_path.exists() {
-            bail!("Local file not found at {:?}", local_path);
+            bail!("Local file not found at {}", local_path.display());
         }
 
         let metadata = std::fs::metadata(local_path)
-            .with_context(|| format!("Failed to read metadata for {:?}", local_path))?;
+            .with_context(|| format!("Failed to read metadata for {}", local_path.display()))?;
 
         if !metadata.is_file() {
-            bail!("{:?} is not a file", local_path);
+            bail!("{} is not a file", local_path.display());
         }
 
         let file_size = metadata.len();
@@ -538,7 +538,7 @@ impl OneDriveClient {
         };
 
         let file_bytes = std::fs::read(local_path)
-            .with_context(|| format!("Failed to read local file {:?}", local_path))?;
+            .with_context(|| format!("Failed to read local file {}", local_path.display()))?;
 
         let mime = mime_guess::from_path(local_path)
             .first_or_octet_stream()
@@ -719,7 +719,7 @@ impl OneDriveClient {
                 // Read chunk bytes from file
                 let chunk_data = {
                     let mut file = StdFile::open(&path)
-                        .with_context(|| format!("Failed to open local file {:?}", path))?;
+                        .with_context(|| format!("Failed to open local file {}", path.display()))?;
                     file.seek(SeekFrom::Start(start))?;
                     let mut buf = vec![0u8; current_chunk_size];
                     file.read_exact(&mut buf)?;
@@ -963,7 +963,7 @@ impl OneDriveClient {
         threads: usize,
     ) -> Result<()> {
         if !local_dir.is_dir() {
-            bail!("{:?} is not a local directory", local_dir);
+            bail!("'{}' is not a local directory", local_dir.display());
         }
 
         let remote_base = Self::normalize_path(remote_dir);

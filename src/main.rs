@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     } else if cli.ipv6 {
         Some("ipv6".to_string())
     } else {
-        config_val.get_ip_preference().map(|s| s.to_string())
+        config_val.get_ip_preference().map(std::string::ToString::to_string)
     };
 
     let config = Arc::new(Mutex::new(config_val));
@@ -202,7 +202,7 @@ async fn main() -> Result<()> {
             let threads = args.threads.or(cli.threads).unwrap_or(default_threads);
 
             if local_p.is_dir() || args.recursive {
-                println!("Uploading directory {:?} -> '{}' (threads: {})...", local_p, remote_dest, threads);
+                println!("Uploading directory {} -> '{}' (threads: {})...", local_p.display(), remote_dest, threads);
                 client.upload_directory(local_p, remote_dest, threads).await?;
                 println!("{} Directory upload complete!", "✓".green().bold());
             } else {
@@ -213,11 +213,11 @@ async fn main() -> Result<()> {
 
         Some(Commands::Download(args)) => {
             let local_dst = PathBuf::from(&args.local_path);
-            let is_dir = client.get_item(&args.remote_path).await.map(|i| i.is_dir()).unwrap_or(false);
+            let is_dir = client.get_item(&args.remote_path).await.is_ok_and(|i| i.is_dir());
             let threads = args.threads.or(cli.threads).unwrap_or(default_threads);
 
             if is_dir || args.recursive {
-                println!("Downloading directory '{}' -> {:?} (threads: {})...", args.remote_path, local_dst, threads);
+                println!("Downloading directory '{}' -> {} (threads: {})...", args.remote_path, local_dst.display(), threads);
                 client.download_directory(&args.remote_path, &local_dst, threads).await?;
                 println!("{} Directory download complete!", "✓".green().bold());
             } else {

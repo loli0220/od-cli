@@ -163,7 +163,7 @@ pub fn print_drive_quota(drive: &Drive) {
         if total > 0 {
             let pct = (used as f64 / total as f64) * 100.0;
             let bar_len: usize = 30;
-            let filled = ((pct / 100.0) * bar_len as f64).round() as usize;
+            let filled = ((pct / 100.0 * bar_len as f64).round() as usize).min(bar_len);
             let empty = bar_len.saturating_sub(filled);
 
             let bar = format!(
@@ -172,7 +172,7 @@ pub fn print_drive_quota(drive: &Drive) {
                 "-".repeat(empty).dimmed(),
                 pct
             );
-            println!("Usage:           {}", bar);
+            println!("Usage:           {bar}");
         }
     }
 }
@@ -197,12 +197,12 @@ pub fn print_item_info(item: &DriveItem) {
     if let Some(ref folder) = item.folder
         && let Some(count) = folder.child_count
     {
-        println!("Children:   {} items", count);
+        println!("Children:   {count} items");
     }
 
     if let Some(ref file) = item.file {
         if let Some(ref mime) = file.mime_type {
-            println!("MIME Type:  {}", mime);
+            println!("MIME Type:  {mime}");
         }
         if let Some(ref hashes) = file.hashes {
             if let Some(ref sha1) = hashes.sha1_hash {

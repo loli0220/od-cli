@@ -48,7 +48,7 @@ impl SessionStore {
         let json = serde_json::to_string_pretty(self)
             .context("Failed to serialize upload sessions")?;
         fs::write(&path, json)
-            .with_context(|| format!("Failed to write upload sessions to {:?}", path))?;
+            .with_context(|| format!("Failed to write upload sessions to {}", path.display()))?;
         Ok(())
     }
 

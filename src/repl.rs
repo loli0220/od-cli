@@ -428,7 +428,7 @@ impl ReplSession {
         };
 
         if local_p.is_dir() || recursive {
-            println!("Uploading local directory {:?} to remote '{}' with {} threads...", local_p, remote_target, threads);
+            println!("Uploading local directory {} to remote '{}' with {} threads...", local_p.display(), remote_target, threads);
             if let Err(e) = self.client.upload_directory(local_p, &remote_target, threads).await {
                 eprintln!("{} {}", "Upload failed:".red().bold(), e);
             } else {
@@ -471,14 +471,14 @@ impl ReplSession {
             PathBuf::from(".")
         };
 
-        let is_dir_check = self.client.get_item(&remote_src).await.map(|i| i.is_dir()).unwrap_or(false);
+        let is_dir_check = self.client.get_item(&remote_src).await.is_ok_and(|i| i.is_dir());
         let threads = {
             let conf = self.config.lock().await;
             conf.get_threads()
         };
 
         if is_dir_check || recursive {
-            println!("Downloading remote folder '{}' to {:?} with {} threads...", remote_src, local_dst, threads);
+            println!("Downloading remote folder '{}' to {} with {} threads...", remote_src, local_dst.display(), threads);
             if let Err(e) = self.client.download_directory(&remote_src, &local_dst, threads).await {
                 eprintln!("{} {}", "Download failed:".red().bold(), e);
             } else {

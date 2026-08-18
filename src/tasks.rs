@@ -96,7 +96,7 @@ impl TaskStore {
         let json = serde_json::to_string_pretty(self)
             .context("Failed to serialize task store")?;
         fs::write(&path, json)
-            .with_context(|| format!("Failed to write tasks to {:?}", path))?;
+            .with_context(|| format!("Failed to write tasks to {}", path.display()))?;
         Ok(())
     }
 
@@ -199,7 +199,7 @@ impl TaskStore {
         let mut list: Vec<TransferTask> = self
             .tasks
             .values()
-            .filter(|t| t.status == TaskStatus::Interrupted || t.status == TaskStatus::Failed || t.status == TaskStatus::Pending)
+            .filter(|t| matches!(t.status, TaskStatus::Interrupted | TaskStatus::Failed | TaskStatus::Pending))
             .cloned()
             .collect();
         list.sort_by_key(|t| t.id.parse::<u64>().unwrap_or(0));

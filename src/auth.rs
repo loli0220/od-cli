@@ -6,6 +6,7 @@ use colored::Colorize;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -30,8 +31,6 @@ pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: Option<String>,
 }
-
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 #[derive(Debug, Deserialize)]
 struct ErrorResponse {
