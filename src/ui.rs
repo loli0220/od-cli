@@ -257,6 +257,67 @@ pub fn create_download_progress(total_bytes: u64, message: &str) -> ProgressBar 
     pb
 }
 
+pub fn print_tasks_table(tasks: &[crate::tasks::TransferTask]) {
+    if tasks.is_empty() {
+        println!("{}", "  (no transfer tasks recorded)".italic().dimmed());
+        return;
+    }
+
+    let mut table = Table::new();
+    table
+        .load_style(UTF8_FULL.with_rounded_corners())
+        .set_content_arrangement(ContentArrangement::Dynamic);
+
+    table.set_header(vec![
+        Cell::new("ID").set_alignment(CellAlignment::Center),
+        Cell::new("Type").set_alignment(CellAlignment::Center),
+        Cell::new("Status").set_alignment(CellAlignment::Center),
+        Cell::new("Local Path"),
+        Cell::new("Remote Path"),
+        Cell::new("Progress").set_alignment(CellAlignment::Right),
+        Cell::new("Updated"),
+    ]);
+
+    for task in tasks {
+        let type_cell = match task.task_type {
+            crate::tasks::TaskType::Upload => Cell::new("Upload").set_alignment(CellAlignment::Center),
+            crate::tasks::TaskType::Download => Cell::new("Download").set_alignment(CellAlignment::Center),
+        };
+
+        let status_str = match task.status {
+            crate::tasks::TaskStatus::Running => "Running".cyan().bold().to_string(),
+            crate::tasks::TaskStatus::Interrupted => "Interrupted".yellow().bold().to_string(),
+            crate::tasks::TaskStatus::Failed => "Failed".red().bold().to_string(),
+            crate::tasks::TaskStatus::Completed => "Completed".green().to_string(),
+            crate::tasks::TaskStatus::Pending => "Pending".dimmed().to_string(),
+        };
+
+        let progress_str = if task.total_size > 0 {
+            let pct = (task.transferred_bytes as f64 / task.total_size as f64) * 100.0;
+            format!("{}/{} ({:.1}%)", format_size(task.transferred_bytes), format_size(task.total_size), pct)
+        } else {
+            format_size(task.transferred_bytes)
+        };
+
+        let dt = chrono::DateTime::from_timestamp(task.updated_at, 0)
+            .map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_else(|| "-".to_string());
+
+        table.add_row(vec![
+            Cell::new(&task.id).set_alignment(CellAlignment::Center),
+            type_cell,
+            Cell::new(status_str).set_alignment(CellAlignment::Center),
+            Cell::new(&task.local_path),
+            Cell::new(&task.remote_path),
+            Cell::new(progress_str).set_alignment(CellAlignment::Right),
+            Cell::new(dt),
+        ]);
+    }
+
+    println!("{table}");
+    println!("Total: {} tasks", tasks.len().to_string().cyan());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

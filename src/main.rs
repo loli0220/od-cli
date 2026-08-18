@@ -4,12 +4,13 @@ mod client;
 mod config;
 mod repl;
 mod sessions;
+mod tasks;
 mod types;
 mod ui;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AuthAction, Cli, Commands, ConfigAction};
+use cli::{AuthAction, Cli, Commands, ConfigAction, TasksAction};
 use colored::Colorize;
 use config::Config;
 use std::path::{Path, PathBuf};
@@ -267,6 +268,74 @@ async fn main() -> Result<()> {
             {
                 println!("{} Share link created successfully ({}):", "✓".green().bold(), args.link_type.to_string().cyan());
                 println!("   {}", url.bright_blue().underline());
+            }
+        }
+
+        Some(Commands::Tasks(args)) => {
+            let action = args.action.unwrap_or(TasksAction::List);
+            match action {
+                TasksAction::List => {
+                    let store = tasks::TaskStore::load();
+                    println!("{}", "=== Transfer Task Queue ===".bold().cyan());
+                    ui::print_tasks_table(&store.list());
+                }
+                TasksAction::Resume { id } => {
+                    let store = tasks::TaskStore::load();
+                    let tasks_to_resume: Vec<tasks::TransferTask> = match id.as_deref() {
+                        Some("all") | None => store.list_resumable(),
+                        Some(id_str) => {
+                            if let Some(t) = store.get(id_str) {
+                                vec![t.clone()]
+                            } else {
+                                eprintln!("{} Task with ID '{}' not found.", "Error:".red(), id_str);
+                                return Ok(());
+                            }
+                        }
+                    };
+
+                    if tasks_to_resume.is_empty() {
+                        println!("{}", "No interrupted or pending tasks to resume.".green());
+                        return Ok(());
+                    }
+
+                    println!(
+                        "⚡ Resuming {} transfer task(s)...",
+                        tasks_to_resume.len().to_string().cyan()
+                    );
+
+                    for task in tasks_to_resume {
+                        println!(
+                            "=> Resuming task [{}]: {} ({}) -> {}",
+                            task.id.yellow(),
+                            task.task_type.to_string().cyan(),
+                            task.local_path,
+                            task.remote_path.cyan()
+                        );
+                        if let Err(e) = client.resume_task(&task).await {
+                            eprintln!("{} Task [{}] failed: {}", "Error:".red(), task.id, e);
+                        } else {
+                            println!("{} Task [{}] completed successfully!", "✓".green().bold(), task.id);
+                        }
+                    }
+                }
+                TasksAction::Rm { id } => {
+                    let mut store = tasks::TaskStore::load();
+                    if store.remove(&id) {
+                        println!("{} Removed task [{}]", "✓".green().bold(), id.yellow());
+                    } else {
+                        eprintln!("{} Task with ID '{}' not found.", "Error:".red(), id);
+                    }
+                }
+                TasksAction::Clear => {
+                    let mut store = tasks::TaskStore::load();
+                    store.clear();
+                    println!("{} Cleared all transfer tasks.", "✓".green().bold());
+                }
+                TasksAction::Clean => {
+                    let mut store = tasks::TaskStore::load();
+                    store.clean_completed();
+                    println!("{} Cleaned up all completed tasks.", "✓".green().bold());
+                }
             }
         }
     }

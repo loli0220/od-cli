@@ -1,6 +1,7 @@
 use crate::auth::AuthManager;
 use crate::config::Config;
 use crate::sessions::SessionStore;
+use crate::tasks::{TaskStore, TaskType, TransferTask};
 use crate::types::*;
 use crate::ui::{create_download_progress, create_upload_progress};
 use anyhow::{bail, Context, Result};
@@ -483,7 +484,17 @@ impl OneDriveClient {
             conf.get_chunk_size_bytes()
         };
 
-        if file_size <= SIMPLE_UPLOAD_MAX_BYTES {
+        let mut task_store = TaskStore::load();
+        let task_id = task_store.create_or_get_task(
+            TaskType::Upload,
+            local_path,
+            &final_remote_path,
+            file_size,
+            false,
+            Some(threads),
+        );
+
+        let res = if file_size <= SIMPLE_UPLOAD_MAX_BYTES {
             self.upload_simple(local_path, &final_remote_path, file_size, show_progress).await
         } else {
             self.upload_chunked(
@@ -496,7 +507,15 @@ impl OneDriveClient {
                 show_progress,
             )
             .await
+        };
+
+        let mut task_store = TaskStore::load();
+        match &res {
+            Ok(_) => task_store.mark_completed(&task_id),
+            Err(e) => task_store.mark_interrupted(&task_id, Some(e.to_string()), 0),
         }
+
+        res
     }
 
     async fn upload_simple(
@@ -793,9 +812,19 @@ impl OneDriveClient {
             std::fs::create_dir_all(parent)?;
         }
 
+        let total_size = item.size.unwrap_or(0);
+        let mut task_store = TaskStore::load();
+        let task_id = task_store.create_or_get_task(
+            TaskType::Download,
+            &target_file_path,
+            remote_path,
+            total_size,
+            false,
+            None,
+        );
+
         // Part file for resumable download
         let part_file_path = PathBuf::from(format!("{}.part", target_file_path.display()));
-        let total_size = item.size.unwrap_or(0);
 
         let mut existing_bytes = 0u64;
         if part_file_path.exists()
@@ -810,6 +839,8 @@ impl OneDriveClient {
             } else if len == total_size {
                 // Already downloaded, rename and return
                 tokio::fs::rename(&part_file_path, &target_file_path).await?;
+                let mut task_store = TaskStore::load();
+                task_store.mark_completed(&task_id);
                 return Ok(());
             }
         }
@@ -824,10 +855,20 @@ impl OneDriveClient {
             req = req.header(RANGE, range_val);
         }
 
-        let res = req.send().await?;
+        let res = req.send().await;
+        let res = match res {
+            Ok(r) => r,
+            Err(e) => {
+                let mut task_store = TaskStore::load();
+                task_store.mark_interrupted(&task_id, Some(e.to_string()), existing_bytes);
+                return Err(e.into());
+            }
+        };
 
         if !res.status().is_success() && res.status() != StatusCode::PARTIAL_CONTENT {
             let err_text = res.text().await.unwrap_or_default();
+            let mut task_store = TaskStore::load();
+            task_store.mark_interrupted(&task_id, Some(err_text.clone()), existing_bytes);
             bail!("Failed to download file '{}': {}", remote_path, err_text);
         }
 
@@ -856,7 +897,14 @@ impl OneDriveClient {
         let mut downloaded = existing_bytes;
 
         while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result.context("Error downloading chunk stream")?;
+            let chunk = match chunk_result {
+                Ok(c) => c,
+                Err(e) => {
+                    let mut task_store = TaskStore::load();
+                    task_store.mark_interrupted(&task_id, Some(e.to_string()), downloaded);
+                    return Err(e.into());
+                }
+            };
             file.write_all(&chunk).await?;
             downloaded += chunk.len() as u64;
             if let Some(ref pb) = pb {
@@ -872,6 +920,9 @@ impl OneDriveClient {
 
         // Rename .part file to final destination
         tokio::fs::rename(&part_file_path, &target_file_path).await?;
+
+        let mut task_store = TaskStore::load();
+        task_store.mark_completed(&task_id);
 
         Ok(())
     }
@@ -1033,6 +1084,29 @@ impl OneDriveClient {
             task.await??;
         }
 
+        Ok(())
+    }
+
+    pub async fn resume_task(&self, task: &TransferTask) -> Result<()> {
+        let threads = task.threads.unwrap_or(4);
+        match task.task_type {
+            TaskType::Upload => {
+                let local_p = Path::new(&task.local_path);
+                if task.is_directory {
+                    self.upload_directory(local_p, &task.remote_path, threads).await?;
+                } else {
+                    self.upload_file(local_p, &task.remote_path, true, threads).await?;
+                }
+            }
+            TaskType::Download => {
+                let local_p = PathBuf::from(&task.local_path);
+                if task.is_directory {
+                    self.download_directory(&task.remote_path, &local_p, threads).await?;
+                } else {
+                    self.download_file(&task.remote_path, &local_p, true).await?;
+                }
+            }
+        }
         Ok(())
     }
 

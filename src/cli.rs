@@ -76,6 +76,10 @@ pub enum Commands {
     /// Create a shareable link for a file or folder
     Share(ShareArgs),
 
+    /// Manage transfer tasks and resume interrupted tasks
+    #[command(alias = "task")]
+    Tasks(TasksArgs),
+
     /// Launch the interactive REPL shell
     #[command(alias = "interactive", alias = "repl")]
     Shell,
@@ -123,6 +127,38 @@ pub enum ConfigAction {
     Show,
     /// Print the path of the config file
     Path,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct TasksArgs {
+    #[command(subcommand)]
+    pub action: Option<TasksAction>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum TasksAction {
+    /// List all transfer tasks
+    #[command(alias = "ls")]
+    List,
+
+    /// Resume interrupted transfer task(s)
+    Resume {
+        /// Task ID to resume (if omitted or 'all', resumes all interrupted tasks)
+        id: Option<String>,
+    },
+
+    /// Remove a transfer task by ID
+    #[command(alias = "delete")]
+    Rm {
+        /// Task ID to remove
+        id: String,
+    },
+
+    /// Clear all transfer tasks
+    Clear,
+
+    /// Clean up completed tasks
+    Clean,
 }
 
 #[derive(Args, Debug, Clone)]

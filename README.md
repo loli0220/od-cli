@@ -21,6 +21,10 @@
   - **下载断点续传**：基于 `.part` 临时文件与 HTTP `Range` 范围请求，中断后重新下载自动继续未完成的部分。
   - **多 Range 单文件并发上传**：超大文件分块切片后支持多线程并发 PUT 上传，跑满带宽。
   - **多文件并发传输**：递归上传/下载目录时，支持 `-j / --threads <N>` 多个文件同时并行传输。
+- 📋 **任务队列与一键恢复（Task Queue & One-Click Resume）**：
+  - 自动持久化记录所有上传/下载传输任务及实时传输进度。
+  - 支持 `od-cli tasks` / `od-cli tasks resume` **一键重试与恢复所有未完成或被中断的任务**。
+  - 支持任务列表查看、单任务恢复、删除指定任务及一键清理已完成任务。
 - 🌐 **IPv4 / IPv6 灵活指定**：
   - 支持命令行参数 `-4 / --ipv4` 和 `-6 / --ipv6` 强制网络协议族。
   - 支持持久化写入配置文件：`od-cli config set ip_preference ipv4`。
@@ -225,6 +229,29 @@ od-cli share /photos/trip.jpg
 
 # 创建可编辑分享链接
 od-cli share /documents/project.docx -t edit
+```
+
+### 12. 任务队列与一键恢复 (`tasks` / `task`)
+```bash
+# 查看所有传输任务与进度
+od-cli tasks
+# 或
+od-cli tasks list
+
+# 一键恢复所有中断或未完成的传输任务
+od-cli tasks resume
+
+# 恢复指定 ID 的任务
+od-cli tasks resume 1
+
+# 删除指定 ID 的任务记录
+od-cli tasks rm 1
+
+# 清理所有已完成的任务
+od-cli tasks clean
+
+# 清空所有任务记录
+od-cli tasks clear
 ```
 
 ---

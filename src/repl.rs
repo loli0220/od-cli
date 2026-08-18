@@ -263,6 +263,9 @@ impl ReplSession {
                         "config" => {
                             self.handle_config(rest).await;
                         }
+                        "tasks" | "task" => {
+                            self.handle_tasks(rest).await;
+                        }
                         "help" | "?" => {
                             self.print_help();
                         }
@@ -589,6 +592,83 @@ impl ReplSession {
         }
     }
 
+    async fn handle_tasks(&self, args: &[String]) {
+        let action = if args.is_empty() { "list" } else { args[0].as_str() };
+        match action {
+            "list" | "ls" | "show" => {
+                let store = crate::tasks::TaskStore::load();
+                println!("{}", "=== Transfer Task Queue ===".bold().cyan());
+                crate::ui::print_tasks_table(&store.list());
+            }
+            "resume" => {
+                let store = crate::tasks::TaskStore::load();
+                let target_id = if args.len() > 1 { Some(args[1].as_str()) } else { None };
+                let tasks_to_resume: Vec<crate::tasks::TransferTask> = match target_id {
+                    Some("all") | None => store.list_resumable(),
+                    Some(id_str) => {
+                        if let Some(t) = store.get(id_str) {
+                            vec![t.clone()]
+                        } else {
+                            eprintln!("{} Task with ID '{}' not found.", "Error:".red(), id_str);
+                            return;
+                        }
+                    }
+                };
+
+                if tasks_to_resume.is_empty() {
+                    println!("{}", "No interrupted or pending tasks to resume.".green());
+                    return;
+                }
+
+                println!(
+                    "⚡ Resuming {} transfer task(s)...",
+                    tasks_to_resume.len().to_string().cyan()
+                );
+
+                for task in tasks_to_resume {
+                    println!(
+                        "=> Resuming task [{}]: {} ({}) -> {}",
+                        task.id.yellow(),
+                        task.task_type.to_string().cyan(),
+                        task.local_path,
+                        task.remote_path.cyan()
+                    );
+                    if let Err(e) = self.client.resume_task(&task).await {
+                        eprintln!("{} Task [{}] failed: {}", "Error:".red(), task.id, e);
+                    } else {
+                        println!("{} Task [{}] completed successfully!", "✓".green().bold(), task.id);
+                    }
+                }
+            }
+            "rm" | "del" | "delete" => {
+                if args.len() < 2 {
+                    println!("{}", "Usage: tasks rm <id>".yellow());
+                    return;
+                }
+                let id = &args[1];
+                let mut store = crate::tasks::TaskStore::load();
+                if store.remove(id) {
+                    println!("{} Removed task [{}]", "✓".green().bold(), id.yellow());
+                } else {
+                    eprintln!("{} Task with ID '{}' not found.", "Error:".red(), id);
+                }
+            }
+            "clear" => {
+                let mut store = crate::tasks::TaskStore::load();
+                store.clear();
+                println!("{} Cleared all transfer tasks.", "✓".green().bold());
+            }
+            "clean" => {
+                let mut store = crate::tasks::TaskStore::load();
+                store.clean_completed();
+                println!("{} Cleaned up all completed tasks.", "✓".green().bold());
+            }
+            _ => {
+                println!("{}", "Usage: tasks [list | resume [id|all] | rm <id> | clean | clear]".yellow());
+            }
+        }
+    }
+
     fn print_help(&self) {
         println!("{}", "Available Interactive Commands:".cyan().bold());
         println!("  {:<26} List files and folders in directory", "ls [-l] [-r] [path]".bright_yellow());
@@ -598,6 +678,7 @@ impl ReplSession {
         println!("  {:<26} Print file contents to stdout", "cat <file>".bright_yellow());
         println!("  {:<26} Upload file or folder (put)", "upload <local> [remote] [-r]".bright_yellow());
         println!("  {:<26} Download file or folder (get)", "download <remote> [local] [-r]".bright_yellow());
+        println!("  {:<26} Manage transfer tasks & queue", "tasks [list|resume|rm|clean]".bright_yellow());
         println!("  {:<26} Delete a file or folder", "rm <path>".bright_yellow());
         println!("  {:<26} Move or rename file/folder", "mv <src> <tgt>".bright_yellow());
         println!("  {:<26} Copy file/folder", "cp <src> <tgt>".bright_yellow());
