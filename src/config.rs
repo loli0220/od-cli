@@ -61,16 +61,17 @@ impl Config {
 
         let content = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read config file at {}", path.display()))?;
-        let config: Config = serde_json::from_str(&content)
-            .with_context(|| "Failed to parse config file JSON")?;
+        let config: Config =
+            serde_json::from_str(&content).with_context(|| "Failed to parse config file JSON")?;
         Ok(config)
     }
 
     pub fn save(&self) -> Result<()> {
         let dir = Self::config_dir()?;
         if !dir.exists() {
-            fs::create_dir_all(&dir)
-                .with_context(|| format!("Failed to create config directory at {}", dir.display()))?;
+            fs::create_dir_all(&dir).with_context(|| {
+                format!("Failed to create config directory at {}", dir.display())
+            })?;
         }
 
         let path = Self::config_path()?;

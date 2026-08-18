@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::types::UserProfile;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::Utc;
 use colored::Colorize;
 use reqwest::Client;
@@ -65,7 +65,12 @@ impl AuthManager {
         let client_id = config.get_client_id();
         let tenant_id = config.get_tenant_id();
 
-        println!("{}", "==> Initiating Microsoft Azure Device Login...".cyan().bold());
+        println!(
+            "{}",
+            "==> Initiating Microsoft Azure Device Login..."
+                .cyan()
+                .bold()
+        );
 
         let device_url = format!(
             "https://login.microsoftonline.com/{}/oauth2/v2.0/devicecode",
@@ -98,10 +103,26 @@ impl AuthManager {
             .context("Failed to parse device code response")?;
 
         println!();
-        println!("{}", "=================== Microsoft Sign-In ===================".yellow().bold());
-        println!("1. Open the URL in your browser: {}", device_res.verification_uri.bright_cyan().underline());
-        println!("2. Enter verification code:      {}", device_res.user_code.bright_green().bold());
-        println!("{}", "=========================================================".yellow().bold());
+        println!(
+            "{}",
+            "=================== Microsoft Sign-In ==================="
+                .yellow()
+                .bold()
+        );
+        println!(
+            "1. Open the URL in your browser: {}",
+            device_res.verification_uri.bright_cyan().underline()
+        );
+        println!(
+            "2. Enter verification code:      {}",
+            device_res.user_code.bright_green().bold()
+        );
+        println!(
+            "{}",
+            "========================================================="
+                .yellow()
+                .bold()
+        );
         println!();
 
         // Try opening browser automatically
@@ -230,7 +251,9 @@ impl AuthManager {
         let refresh_token = match &config.refresh_token {
             Some(rt) if !rt.trim().is_empty() => rt.clone(),
             _ => {
-                bail!("Access token expired and no refresh token found. Please run `od-cli auth login` again.");
+                bail!(
+                    "Access token expired and no refresh token found. Please run `od-cli auth login` again."
+                );
             }
         };
 

@@ -28,7 +28,9 @@ async fn main() -> Result<()> {
     } else if cli.ipv6 {
         Some("ipv6".to_string())
     } else {
-        config_val.get_ip_preference().map(std::string::ToString::to_string)
+        config_val
+            .get_ip_preference()
+            .map(std::string::ToString::to_string)
     };
 
     let config = Arc::new(Mutex::new(config_val));
@@ -60,11 +62,23 @@ async fn main() -> Result<()> {
             AuthAction::Status => {
                 let conf = config.lock().await;
                 if conf.access_token.is_none() {
-                    println!("{}", "Not logged in. Run `od-cli auth login` to sign in.".yellow());
+                    println!(
+                        "{}",
+                        "Not logged in. Run `od-cli auth login` to sign in.".yellow()
+                    );
                 } else {
                     println!("{}", "=== Authentication Status ===".bold().cyan());
-                    println!("User:         {}", conf.user_principal_name.as_deref().unwrap_or("Unknown").bright_green());
-                    println!("Display Name: {}", conf.display_name.as_deref().unwrap_or("Unknown").yellow());
+                    println!(
+                        "User:         {}",
+                        conf.user_principal_name
+                            .as_deref()
+                            .unwrap_or("Unknown")
+                            .bright_green()
+                    );
+                    println!(
+                        "Display Name: {}",
+                        conf.display_name.as_deref().unwrap_or("Unknown").yellow()
+                    );
                     println!("Tenant:       {}", conf.get_tenant_id().dimmed());
                     println!("Client ID:    {}", conf.get_client_id().dimmed());
                     println!(
@@ -92,7 +106,9 @@ async fn main() -> Result<()> {
                         println!("Set {} = {}", "tenant_id".cyan(), value);
                     }
                     "chunk_size_mb" => {
-                        let mb: usize = value.parse().map_err(|_| anyhow::anyhow!("Invalid number for chunk_size_mb"))?;
+                        let mb: usize = value
+                            .parse()
+                            .map_err(|_| anyhow::anyhow!("Invalid number for chunk_size_mb"))?;
                         conf.chunk_size_mb = Some(mb);
                         println!("Set {} = {} MB", "chunk_size_mb".cyan(), mb);
                     }
@@ -106,7 +122,9 @@ async fn main() -> Result<()> {
                         println!("Set {} = {}", "ip_preference".cyan(), val);
                     }
                     "threads" | "concurrency" | "jobs" => {
-                        let th: usize = value.parse().map_err(|_| anyhow::anyhow!("Invalid number for threads"))?;
+                        let th: usize = value
+                            .parse()
+                            .map_err(|_| anyhow::anyhow!("Invalid number for threads"))?;
                         conf.threads = Some(th.max(1));
                         println!("Set {} = {}", "threads".cyan(), th.max(1));
                     }
@@ -126,8 +144,13 @@ async fn main() -> Result<()> {
                 match key.to_lowercase().as_str() {
                     "client_id" => println!("{}", conf.get_client_id()),
                     "tenant_id" => println!("{}", conf.get_tenant_id()),
-                    "chunk_size_mb" => println!("{}", conf.chunk_size_mb.unwrap_or(config::DEFAULT_CHUNK_SIZE_MB)),
-                    "ip_preference" | "ip_version" | "ip" => println!("{}", conf.ip_preference.as_deref().unwrap_or("auto")),
+                    "chunk_size_mb" => println!(
+                        "{}",
+                        conf.chunk_size_mb.unwrap_or(config::DEFAULT_CHUNK_SIZE_MB)
+                    ),
+                    "ip_preference" | "ip_version" | "ip" => {
+                        println!("{}", conf.ip_preference.as_deref().unwrap_or("auto"))
+                    }
                     "threads" | "concurrency" | "jobs" => println!("{}", conf.get_threads()),
                     other => {
                         eprintln!("Unknown configuration key: {}", other.red());
@@ -137,16 +160,35 @@ async fn main() -> Result<()> {
             ConfigAction::Show => {
                 let conf = config.lock().await;
                 println!("{}", "=== od-cli Configuration ===".bold().cyan());
-                println!("Config Path:   {}", Config::config_path()?.display().to_string().dimmed());
+                println!(
+                    "Config Path:   {}",
+                    Config::config_path()?.display().to_string().dimmed()
+                );
                 println!("Client ID:     {}", conf.get_client_id().bright_green());
                 println!("Tenant ID:     {}", conf.get_tenant_id().bright_green());
                 println!(
                     "Chunk Size:    {} MB",
-                    conf.chunk_size_mb.unwrap_or(config::DEFAULT_CHUNK_SIZE_MB).to_string().bright_yellow()
+                    conf.chunk_size_mb
+                        .unwrap_or(config::DEFAULT_CHUNK_SIZE_MB)
+                        .to_string()
+                        .bright_yellow()
                 );
-                println!("IP Preference: {}", conf.ip_preference.as_deref().unwrap_or("auto").cyan());
-                println!("Threads:       {}", conf.get_threads().to_string().bright_yellow());
-                println!("Logged In:     {}", if conf.access_token.is_some() { "Yes".green() } else { "No".red() });
+                println!(
+                    "IP Preference: {}",
+                    conf.ip_preference.as_deref().unwrap_or("auto").cyan()
+                );
+                println!(
+                    "Threads:       {}",
+                    conf.get_threads().to_string().bright_yellow()
+                );
+                println!(
+                    "Logged In:     {}",
+                    if conf.access_token.is_some() {
+                        "Yes".green()
+                    } else {
+                        "No".red()
+                    }
+                );
                 if let Some(ref email) = conf.user_principal_name {
                     println!("Account:       {}", email.cyan());
                 }
@@ -193,7 +235,12 @@ async fn main() -> Result<()> {
 
         Some(Commands::Mkdir(args)) => {
             let item = client.create_folder(&args.path, args.parents).await?;
-            println!("{} Created folder '{}' (ID: {})", "✓".green().bold(), item.name.cyan(), item.id.dimmed());
+            println!(
+                "{} Created folder '{}' (ID: {})",
+                "✓".green().bold(),
+                item.name.cyan(),
+                item.id.dimmed()
+            );
         }
 
         Some(Commands::Upload(args)) => {
@@ -202,26 +249,52 @@ async fn main() -> Result<()> {
             let threads = args.threads.or(cli.threads).unwrap_or(default_threads);
 
             if local_p.is_dir() || args.recursive {
-                println!("Uploading directory {} -> '{}' (threads: {})...", local_p.display(), remote_dest, threads);
-                client.upload_directory(local_p, remote_dest, threads).await?;
+                println!(
+                    "Uploading directory {} -> '{}' (threads: {})...",
+                    local_p.display(),
+                    remote_dest,
+                    threads
+                );
+                client
+                    .upload_directory(local_p, remote_dest, threads)
+                    .await?;
                 println!("{} Directory upload complete!", "✓".green().bold());
             } else {
-                let item = client.upload_file(local_p, remote_dest, true, threads).await?;
-                println!("{} Uploaded '{}' (Size: {})", "✓".green().bold(), item.name.cyan(), ui::format_size(item.size.unwrap_or(0)));
+                let item = client
+                    .upload_file(local_p, remote_dest, true, threads)
+                    .await?;
+                println!(
+                    "{} Uploaded '{}' (Size: {})",
+                    "✓".green().bold(),
+                    item.name.cyan(),
+                    ui::format_size(item.size.unwrap_or(0))
+                );
             }
         }
 
         Some(Commands::Download(args)) => {
             let local_dst = PathBuf::from(&args.local_path);
-            let is_dir = client.get_item(&args.remote_path).await.is_ok_and(|i| i.is_dir());
+            let is_dir = client
+                .get_item(&args.remote_path)
+                .await
+                .is_ok_and(|i| i.is_dir());
             let threads = args.threads.or(cli.threads).unwrap_or(default_threads);
 
             if is_dir || args.recursive {
-                println!("Downloading directory '{}' -> {} (threads: {})...", args.remote_path, local_dst.display(), threads);
-                client.download_directory(&args.remote_path, &local_dst, threads).await?;
+                println!(
+                    "Downloading directory '{}' -> {} (threads: {})...",
+                    args.remote_path,
+                    local_dst.display(),
+                    threads
+                );
+                client
+                    .download_directory(&args.remote_path, &local_dst, threads)
+                    .await?;
                 println!("{} Directory download complete!", "✓".green().bold());
             } else {
-                client.download_file(&args.remote_path, &local_dst, true).await?;
+                client
+                    .download_file(&args.remote_path, &local_dst, true)
+                    .await?;
                 println!("{} Download complete.", "✓".green().bold());
             }
         }
@@ -237,12 +310,22 @@ async fn main() -> Result<()> {
 
         Some(Commands::Mv(args)) => {
             let item = client.move_item(&args.source, &args.target).await?;
-            println!("{} Moved '{}' -> '{}'", "✓".green().bold(), args.source.dimmed(), item.name.cyan());
+            println!(
+                "{} Moved '{}' -> '{}'",
+                "✓".green().bold(),
+                args.source.dimmed(),
+                item.name.cyan()
+            );
         }
 
         Some(Commands::Cp(args)) => {
             client.copy_item(&args.source, &args.target).await?;
-            println!("{} Initiated copy '{}' -> '{}'", "✓".green().bold(), args.source.dimmed(), args.target.cyan());
+            println!(
+                "{} Initiated copy '{}' -> '{}'",
+                "✓".green().bold(),
+                args.source.dimmed(),
+                args.target.cyan()
+            );
         }
 
         Some(Commands::Search(args)) => {
@@ -266,7 +349,11 @@ async fn main() -> Result<()> {
             if let Some(link) = perm.link
                 && let Some(url) = link.web_url
             {
-                println!("{} Share link created successfully ({}):", "✓".green().bold(), args.link_type.to_string().cyan());
+                println!(
+                    "{} Share link created successfully ({}):",
+                    "✓".green().bold(),
+                    args.link_type.to_string().cyan()
+                );
                 println!("   {}", url.bright_blue().underline());
             }
         }
@@ -287,7 +374,11 @@ async fn main() -> Result<()> {
                             if let Some(t) = store.get(id_str) {
                                 vec![t.clone()]
                             } else {
-                                eprintln!("{} Task with ID '{}' not found.", "Error:".red(), id_str);
+                                eprintln!(
+                                    "{} Task with ID '{}' not found.",
+                                    "Error:".red(),
+                                    id_str
+                                );
                                 return Ok(());
                             }
                         }
@@ -314,7 +405,11 @@ async fn main() -> Result<()> {
                         if let Err(e) = client.resume_task(&task).await {
                             eprintln!("{} Task [{}] failed: {}", "Error:".red(), task.id, e);
                         } else {
-                            println!("{} Task [{}] completed successfully!", "✓".green().bold(), task.id);
+                            println!(
+                                "{} Task [{}] completed successfully!",
+                                "✓".green().bold(),
+                                task.id
+                            );
                         }
                     }
                 }
@@ -372,7 +467,12 @@ fn list_recursive_cli<'a>(
                         item.id.dimmed()
                     );
                 } else {
-                    println!("{}{:<30} {:>10}", indent, item.name, ui::format_size(size).dimmed());
+                    println!(
+                        "{}{:<30} {:>10}",
+                        indent,
+                        item.name,
+                        ui::format_size(size).dimmed()
+                    );
                 }
             }
         }

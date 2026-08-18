@@ -4,11 +4,11 @@ use crate::sessions::SessionStore;
 use crate::tasks::{TaskStore, TaskType, TransferTask};
 use crate::types::*;
 use crate::ui::{create_download_progress, create_upload_progress};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use bytes::Bytes;
 use colored::Colorize;
 use futures_util::StreamExt;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, RANGE};
+use reqwest::header::{CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, HeaderMap, HeaderValue, RANGE};
 use reqwest::{Client, StatusCode};
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, SeekFrom};
@@ -94,7 +94,10 @@ impl OneDriveClient {
         if normalized_path.is_empty() {
             format!("{}/me/drive/root/children", GRAPH_BASE_URL)
         } else {
-            format!("{}/me/drive/root:/{}:/children", GRAPH_BASE_URL, normalized_path)
+            format!(
+                "{}/me/drive/root:/{}:/children",
+                GRAPH_BASE_URL, normalized_path
+            )
         }
     }
 
@@ -102,7 +105,10 @@ impl OneDriveClient {
         if normalized_path.is_empty() {
             format!("{}/me/drive/root/content", GRAPH_BASE_URL)
         } else {
-            format!("{}/me/drive/root:/{}:/content", GRAPH_BASE_URL, normalized_path)
+            format!(
+                "{}/me/drive/root:/{}:/content",
+                GRAPH_BASE_URL, normalized_path
+            )
         }
     }
 
@@ -110,7 +116,10 @@ impl OneDriveClient {
         if normalized_path.is_empty() {
             format!("{}/me/drive/root/createUploadSession", GRAPH_BASE_URL)
         } else {
-            format!("{}/me/drive/root:/{}:/createUploadSession", GRAPH_BASE_URL, normalized_path)
+            format!(
+                "{}/me/drive/root:/{}:/createUploadSession",
+                GRAPH_BASE_URL, normalized_path
+            )
         }
     }
 
@@ -386,7 +395,10 @@ impl OneDriveClient {
     pub async fn search(&self, query: &str) -> Result<Vec<DriveItem>> {
         let token = self.get_token().await?;
         let encoded_query = urlencoding::encode(query);
-        let url = format!("{}/me/drive/root/search(q='{}')", GRAPH_BASE_URL, encoded_query);
+        let url = format!(
+            "{}/me/drive/root/search(q='{}')",
+            GRAPH_BASE_URL, encoded_query
+        );
 
         let res = self.http.get(&url).bearer_auth(token).send().await?;
 
@@ -495,7 +507,8 @@ impl OneDriveClient {
         );
 
         let res = if file_size <= SIMPLE_UPLOAD_MAX_BYTES {
-            self.upload_simple(local_path, &final_remote_path, file_size, show_progress).await
+            self.upload_simple(local_path, &final_remote_path, file_size, show_progress)
+                .await
         } else {
             self.upload_chunked(
                 local_path,
@@ -587,9 +600,9 @@ impl OneDriveClient {
         if missing_ranges.is_empty() {
             return true;
         }
-        missing_ranges.iter().any(|&(r_start, r_end)| {
-            start <= r_end && end >= r_start
-        })
+        missing_ranges
+            .iter()
+            .any(|&(r_start, r_end)| start <= r_end && end >= r_start)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -686,10 +699,7 @@ impl OneDriveClient {
         let already_uploaded = total_size.saturating_sub(needed_bytes);
 
         let pb = if show_progress {
-            let bar = create_upload_progress(
-                total_size,
-                &format!("Uploading {}", remote_path),
-            );
+            let bar = create_upload_progress(total_size, &format!("Uploading {}", remote_path));
             bar.set_position(already_uploaded);
             Some(Arc::new(bar))
         } else {
@@ -729,10 +739,7 @@ impl OneDriveClient {
                 let range_header = format!("bytes {}-{}/{}", start, end, total_size);
                 let mut headers = HeaderMap::new();
                 headers.insert(CONTENT_LENGTH, HeaderValue::from(current_chunk_size));
-                headers.insert(
-                    CONTENT_RANGE,
-                    HeaderValue::from_str(&range_header).unwrap(),
-                );
+                headers.insert(CONTENT_RANGE, HeaderValue::from_str(&range_header).unwrap());
 
                 let res = http
                     .put(url.as_str())
@@ -797,7 +804,10 @@ impl OneDriveClient {
     ) -> Result<()> {
         let item = self.get_item(remote_path).await?;
         if item.is_dir() {
-            bail!("'{}' is a directory. Use download directory mode instead.", remote_path);
+            bail!(
+                "'{}' is a directory. Use download directory mode instead.",
+                remote_path
+            );
         }
 
         let target_file_path = if local_path.is_dir() {
@@ -834,7 +844,10 @@ impl OneDriveClient {
             if len < total_size {
                 existing_bytes = len;
                 if show_progress && existing_bytes > 0 {
-                    println!("{}", format!("⚡ Resuming download from byte {}...", existing_bytes).cyan());
+                    println!(
+                        "{}",
+                        format!("⚡ Resuming download from byte {}...", existing_bytes).cyan()
+                    );
                 }
             } else if len == total_size {
                 // Already downloaded, rename and return
@@ -873,10 +886,7 @@ impl OneDriveClient {
         }
 
         let pb = if show_progress && total_size > 0 {
-            let bar = create_download_progress(
-                total_size,
-                &format!("Downloading {}", item.name),
-            );
+            let bar = create_download_progress(total_size, &format!("Downloading {}", item.name));
             bar.set_position(existing_bytes);
             Some(bar)
         } else {
@@ -1000,7 +1010,11 @@ impl OneDriveClient {
             let _ = self.create_folder(&dir, true).await;
         }
 
-        println!("Found {} files to upload with {} concurrent threads...", files_to_upload.len().to_string().cyan(), threads.to_string().yellow());
+        println!(
+            "Found {} files to upload with {} concurrent threads...",
+            files_to_upload.len().to_string().cyan(),
+            threads.to_string().yellow()
+        );
 
         let semaphore = Arc::new(Semaphore::new(threads.max(1)));
         let mut tasks = Vec::new();
@@ -1064,7 +1078,11 @@ impl OneDriveClient {
             }
         }
 
-        println!("Found {} files to download with {} concurrent threads...", files_to_download.len().to_string().cyan(), threads.to_string().yellow());
+        println!(
+            "Found {} files to download with {} concurrent threads...",
+            files_to_download.len().to_string().cyan(),
+            threads.to_string().yellow()
+        );
 
         let semaphore = Arc::new(Semaphore::new(threads.max(1)));
         let mut tasks = Vec::new();
@@ -1075,7 +1093,11 @@ impl OneDriveClient {
 
             tasks.push(tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
-                println!("=> Downloading: {} -> {}", remote_f.cyan(), local_f.display());
+                println!(
+                    "=> Downloading: {} -> {}",
+                    remote_f.cyan(),
+                    local_f.display()
+                );
                 client.download_file(&remote_f, &local_f, true).await
             }));
         }
@@ -1093,17 +1115,21 @@ impl OneDriveClient {
             TaskType::Upload => {
                 let local_p = Path::new(&task.local_path);
                 if task.is_directory {
-                    self.upload_directory(local_p, &task.remote_path, threads).await?;
+                    self.upload_directory(local_p, &task.remote_path, threads)
+                        .await?;
                 } else {
-                    self.upload_file(local_p, &task.remote_path, true, threads).await?;
+                    self.upload_file(local_p, &task.remote_path, true, threads)
+                        .await?;
                 }
             }
             TaskType::Download => {
                 let local_p = PathBuf::from(&task.local_path);
                 if task.is_directory {
-                    self.download_directory(&task.remote_path, &local_p, threads).await?;
+                    self.download_directory(&task.remote_path, &local_p, threads)
+                        .await?;
                 } else {
-                    self.download_file(&task.remote_path, &local_p, true).await?;
+                    self.download_file(&task.remote_path, &local_p, true)
+                        .await?;
                 }
             }
         }
@@ -1128,10 +1154,22 @@ mod tests {
         assert_eq!(OneDriveClient::normalize_path(""), "");
         assert_eq!(OneDriveClient::normalize_path("/"), "");
         assert_eq!(OneDriveClient::normalize_path("///"), "");
-        assert_eq!(OneDriveClient::normalize_path("/folder/subfolder"), "folder/subfolder");
-        assert_eq!(OneDriveClient::normalize_path("folder/subfolder/file.txt"), "folder/subfolder/file.txt");
-        assert_eq!(OneDriveClient::normalize_path("folder/sub/../file.txt"), "folder/file.txt");
-        assert_eq!(OneDriveClient::normalize_path(r"folder\sub\file.txt"), "folder/sub/file.txt");
+        assert_eq!(
+            OneDriveClient::normalize_path("/folder/subfolder"),
+            "folder/subfolder"
+        );
+        assert_eq!(
+            OneDriveClient::normalize_path("folder/subfolder/file.txt"),
+            "folder/subfolder/file.txt"
+        );
+        assert_eq!(
+            OneDriveClient::normalize_path("folder/sub/../file.txt"),
+            "folder/file.txt"
+        );
+        assert_eq!(
+            OneDriveClient::normalize_path(r"folder\sub\file.txt"),
+            "folder/sub/file.txt"
+        );
         assert_eq!(OneDriveClient::normalize_path("/a/b/../../c"), "c");
     }
 
@@ -1139,8 +1177,14 @@ mod tests {
     fn test_is_chunk_needed() {
         let missing = vec![(10485760, 20971519), (31457280, u64::MAX)];
         assert!(!OneDriveClient::is_chunk_needed(0, 10485759, &missing));
-        assert!(OneDriveClient::is_chunk_needed(10485760, 20971519, &missing));
-        assert!(!OneDriveClient::is_chunk_needed(20971520, 31457279, &missing));
-        assert!(OneDriveClient::is_chunk_needed(31457280, 41943039, &missing));
+        assert!(OneDriveClient::is_chunk_needed(
+            10485760, 20971519, &missing
+        ));
+        assert!(!OneDriveClient::is_chunk_needed(
+            20971520, 31457279, &missing
+        ));
+        assert!(OneDriveClient::is_chunk_needed(
+            31457280, 41943039, &missing
+        ));
     }
 }

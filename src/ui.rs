@@ -66,7 +66,11 @@ pub fn print_items_table(items: &[DriveItem], long_mode: bool) {
             };
 
             let size_cell = if item.is_dir() {
-                let count = item.folder.as_ref().and_then(|f| f.child_count).unwrap_or(0);
+                let count = item
+                    .folder
+                    .as_ref()
+                    .and_then(|f| f.child_count)
+                    .unwrap_or(0);
                 Cell::new(format!("{} items", count)).set_alignment(CellAlignment::Right)
             } else {
                 let s = item.size.unwrap_or(0);
@@ -109,7 +113,11 @@ pub fn print_items_table(items: &[DriveItem], long_mode: bool) {
             };
 
             let size_cell = if item.is_dir() {
-                let count = item.folder.as_ref().and_then(|f| f.child_count).unwrap_or(0);
+                let count = item
+                    .folder
+                    .as_ref()
+                    .and_then(|f| f.child_count)
+                    .unwrap_or(0);
                 Cell::new(format!("{} items", count)).set_alignment(CellAlignment::Right)
             } else {
                 let s = item.size.unwrap_or(0);
@@ -122,12 +130,7 @@ pub fn print_items_table(items: &[DriveItem], long_mode: bool) {
                 .map(format_datetime)
                 .unwrap_or_else(|| "-".to_string());
 
-            table.add_row(vec![
-                type_cell,
-                name_cell,
-                size_cell,
-                Cell::new(mod_time),
-            ]);
+            table.add_row(vec![type_cell, name_cell, size_cell, Cell::new(mod_time)]);
         }
     }
 
@@ -280,8 +283,12 @@ pub fn print_tasks_table(tasks: &[crate::tasks::TransferTask]) {
 
     for task in tasks {
         let type_cell = match task.task_type {
-            crate::tasks::TaskType::Upload => Cell::new("Upload").set_alignment(CellAlignment::Center),
-            crate::tasks::TaskType::Download => Cell::new("Download").set_alignment(CellAlignment::Center),
+            crate::tasks::TaskType::Upload => {
+                Cell::new("Upload").set_alignment(CellAlignment::Center)
+            }
+            crate::tasks::TaskType::Download => {
+                Cell::new("Download").set_alignment(CellAlignment::Center)
+            }
         };
 
         let status_str = match task.status {
@@ -294,7 +301,12 @@ pub fn print_tasks_table(tasks: &[crate::tasks::TransferTask]) {
 
         let progress_str = if task.total_size > 0 {
             let pct = (task.transferred_bytes as f64 / task.total_size as f64) * 100.0;
-            format!("{}/{} ({:.1}%)", format_size(task.transferred_bytes), format_size(task.total_size), pct)
+            format!(
+                "{}/{} ({:.1}%)",
+                format_size(task.transferred_bytes),
+                format_size(task.total_size),
+                pct
+            )
         } else {
             format_size(task.transferred_bytes)
         };

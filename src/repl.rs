@@ -3,8 +3,8 @@ use crate::config::Config;
 use crate::ui::{print_drive_quota, print_item_info, print_items_table};
 use anyhow::Result;
 use colored::Colorize;
-use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+use rustyline::error::ReadlineError;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -16,10 +16,7 @@ pub struct ReplSession {
 }
 
 impl ReplSession {
-    pub fn new(
-        client: Arc<OneDriveClient>,
-        config: Arc<Mutex<Config>>,
-    ) -> Self {
+    pub fn new(client: Arc<OneDriveClient>, config: Arc<Mutex<Config>>) -> Self {
         Self {
             client,
             config,
@@ -61,9 +58,24 @@ impl ReplSession {
         }
 
         println!();
-        println!("{}", "=========================================================".cyan().bold());
-        println!("{}", "     Welcome to OneDrive Interactive Shell (od-cli)     ".bright_white().bold());
-        println!("{}", "=========================================================".cyan().bold());
+        println!(
+            "{}",
+            "========================================================="
+                .cyan()
+                .bold()
+        );
+        println!(
+            "{}",
+            "     Welcome to OneDrive Interactive Shell (od-cli)     "
+                .bright_white()
+                .bold()
+        );
+        println!(
+            "{}",
+            "========================================================="
+                .cyan()
+                .bold()
+        );
         println!(
             "Type {} to see available commands, {} or {} to exit.",
             "help".yellow().bold(),
@@ -146,7 +158,11 @@ impl ReplSession {
                                 if let Some(p) = path_arg {
                                     let resolved = self.resolve_path(p);
                                     match self.client.create_folder(&resolved, recursive).await {
-                                        Ok(item) => println!("{} Created folder '{}'", "✓".green().bold(), item.name.cyan()),
+                                        Ok(item) => println!(
+                                            "{} Created folder '{}'",
+                                            "✓".green().bold(),
+                                            item.name.cyan()
+                                        ),
                                         Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
                                     }
                                 } else {
@@ -166,7 +182,11 @@ impl ReplSession {
                             } else {
                                 let resolved = self.resolve_path(&rest[0]);
                                 match self.client.delete_item(&resolved).await {
-                                    Ok(_) => println!("{} Deleted '{}'", "✓".green().bold(), resolved.red()),
+                                    Ok(_) => println!(
+                                        "{} Deleted '{}'",
+                                        "✓".green().bold(),
+                                        resolved.red()
+                                    ),
                                     Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
                                 }
                             }
@@ -178,7 +198,12 @@ impl ReplSession {
                                 let src = self.resolve_path(&rest[0]);
                                 let tgt = self.resolve_path(&rest[1]);
                                 match self.client.move_item(&src, &tgt).await {
-                                    Ok(item) => println!("{} Moved '{}' -> '{}'", "✓".green().bold(), src.dimmed(), item.name.cyan()),
+                                    Ok(item) => println!(
+                                        "{} Moved '{}' -> '{}'",
+                                        "✓".green().bold(),
+                                        src.dimmed(),
+                                        item.name.cyan()
+                                    ),
                                     Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
                                 }
                             }
@@ -190,7 +215,12 @@ impl ReplSession {
                                 let src = self.resolve_path(&rest[0]);
                                 let tgt = self.resolve_path(&rest[1]);
                                 match self.client.copy_item(&src, &tgt).await {
-                                    Ok(_) => println!("{} Copying '{}' to '{}' (async)", "✓".green().bold(), src.dimmed(), tgt.cyan()),
+                                    Ok(_) => println!(
+                                        "{} Copying '{}' to '{}' (async)",
+                                        "✓".green().bold(),
+                                        src.dimmed(),
+                                        tgt.cyan()
+                                    ),
                                     Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
                                 }
                             }
@@ -214,12 +244,10 @@ impl ReplSession {
                                 }
                             }
                         }
-                        "quota" | "df" => {
-                            match self.client.get_drive().await {
-                                Ok(drive) => print_drive_quota(&drive),
-                                Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
-                            }
-                        }
+                        "quota" | "df" => match self.client.get_drive().await {
+                            Ok(drive) => print_drive_quota(&drive),
+                            Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
+                        },
                         "search" | "find" => {
                             if rest.is_empty() {
                                 println!("{}", "Usage: search <keyword>".yellow());
@@ -233,20 +261,32 @@ impl ReplSession {
                         }
                         "share" => {
                             if rest.is_empty() {
-                                println!("{}", "Usage: share <remote_path> [-t view|edit]".yellow());
+                                println!(
+                                    "{}",
+                                    "Usage: share <remote_path> [-t view|edit]".yellow()
+                                );
                             } else {
                                 let resolved = self.resolve_path(&rest[0]);
-                                let link_type = if rest.iter().any(|a| a == "edit" || a == "-t edit") {
-                                    "edit"
-                                } else {
-                                    "view"
-                                };
-                                match self.client.create_share_link(&resolved, link_type, Some("anonymous")).await {
+                                let link_type =
+                                    if rest.iter().any(|a| a == "edit" || a == "-t edit") {
+                                        "edit"
+                                    } else {
+                                        "view"
+                                    };
+                                match self
+                                    .client
+                                    .create_share_link(&resolved, link_type, Some("anonymous"))
+                                    .await
+                                {
                                     Ok(perm) => {
                                         if let Some(link) = perm.link
                                             && let Some(url) = link.web_url
                                         {
-                                            println!("{} Share link created ({}):", "✓".green().bold(), link_type.cyan());
+                                            println!(
+                                                "{} Share link created ({}):",
+                                                "✓".green().bold(),
+                                                link_type.cyan()
+                                            );
                                             println!("   {}", url.bright_blue().underline());
                                         }
                                     }
@@ -256,8 +296,17 @@ impl ReplSession {
                         }
                         "whoami" | "status" => {
                             let conf = self.config.lock().await;
-                            println!("User Principal: {}", conf.user_principal_name.as_deref().unwrap_or("Unknown").bright_green());
-                            println!("Display Name:   {}", conf.display_name.as_deref().unwrap_or("Unknown").yellow());
+                            println!(
+                                "User Principal: {}",
+                                conf.user_principal_name
+                                    .as_deref()
+                                    .unwrap_or("Unknown")
+                                    .bright_green()
+                            );
+                            println!(
+                                "Display Name:   {}",
+                                conf.display_name.as_deref().unwrap_or("Unknown").yellow()
+                            );
                             println!("Tenant ID:      {}", conf.get_tenant_id().dimmed());
                         }
                         "config" => {
@@ -381,7 +430,12 @@ impl ReplSession {
                                     item.id.dimmed()
                                 );
                             } else {
-                                println!("{}{:<30} {:>10}", indent, item.name, crate::ui::format_size(size).dimmed());
+                                println!(
+                                    "{}{:<30} {:>10}",
+                                    indent,
+                                    item.name,
+                                    crate::ui::format_size(size).dimmed()
+                                );
                             }
                         }
                     }
@@ -395,7 +449,10 @@ impl ReplSession {
 
     async fn handle_upload(&self, args: &[String]) {
         if args.is_empty() {
-            println!("{}", "Usage: upload <local_path> [remote_path] [-r]".yellow());
+            println!(
+                "{}",
+                "Usage: upload <local_path> [remote_path] [-r]".yellow()
+            );
             return;
         }
 
@@ -411,7 +468,10 @@ impl ReplSession {
         }
 
         if positional.is_empty() {
-            println!("{}", "Usage: upload <local_path> [remote_path] [-r]".yellow());
+            println!(
+                "{}",
+                "Usage: upload <local_path> [remote_path] [-r]".yellow()
+            );
             return;
         }
 
@@ -428,15 +488,32 @@ impl ReplSession {
         };
 
         if local_p.is_dir() || recursive {
-            println!("Uploading local directory {} to remote '{}' with {} threads...", local_p.display(), remote_target, threads);
-            if let Err(e) = self.client.upload_directory(local_p, &remote_target, threads).await {
+            println!(
+                "Uploading local directory {} to remote '{}' with {} threads...",
+                local_p.display(),
+                remote_target,
+                threads
+            );
+            if let Err(e) = self
+                .client
+                .upload_directory(local_p, &remote_target, threads)
+                .await
+            {
                 eprintln!("{} {}", "Upload failed:".red().bold(), e);
             } else {
                 println!("{} Directory upload complete!", "✓".green().bold());
             }
         } else {
-            match self.client.upload_file(local_p, &remote_target, true, threads).await {
-                Ok(item) => println!("{} Uploaded '{}' successfully.", "✓".green().bold(), item.name.cyan()),
+            match self
+                .client
+                .upload_file(local_p, &remote_target, true, threads)
+                .await
+            {
+                Ok(item) => println!(
+                    "{} Uploaded '{}' successfully.",
+                    "✓".green().bold(),
+                    item.name.cyan()
+                ),
                 Err(e) => eprintln!("{} {}", "Upload failed:".red().bold(), e),
             }
         }
@@ -444,7 +521,10 @@ impl ReplSession {
 
     async fn handle_download(&self, args: &[String]) {
         if args.is_empty() {
-            println!("{}", "Usage: download <remote_path> [local_path] [-r]".yellow());
+            println!(
+                "{}",
+                "Usage: download <remote_path> [local_path] [-r]".yellow()
+            );
             return;
         }
 
@@ -460,7 +540,10 @@ impl ReplSession {
         }
 
         if positional.is_empty() {
-            println!("{}", "Usage: download <remote_path> [local_path] [-r]".yellow());
+            println!(
+                "{}",
+                "Usage: download <remote_path> [local_path] [-r]".yellow()
+            );
             return;
         }
 
@@ -471,21 +554,38 @@ impl ReplSession {
             PathBuf::from(".")
         };
 
-        let is_dir_check = self.client.get_item(&remote_src).await.is_ok_and(|i| i.is_dir());
+        let is_dir_check = self
+            .client
+            .get_item(&remote_src)
+            .await
+            .is_ok_and(|i| i.is_dir());
         let threads = {
             let conf = self.config.lock().await;
             conf.get_threads()
         };
 
         if is_dir_check || recursive {
-            println!("Downloading remote folder '{}' to {} with {} threads...", remote_src, local_dst.display(), threads);
-            if let Err(e) = self.client.download_directory(&remote_src, &local_dst, threads).await {
+            println!(
+                "Downloading remote folder '{}' to {} with {} threads...",
+                remote_src,
+                local_dst.display(),
+                threads
+            );
+            if let Err(e) = self
+                .client
+                .download_directory(&remote_src, &local_dst, threads)
+                .await
+            {
                 eprintln!("{} {}", "Download failed:".red().bold(), e);
             } else {
                 println!("{} Directory download complete!", "✓".green().bold());
             }
         } else {
-            if let Err(e) = self.client.download_file(&remote_src, &local_dst, true).await {
+            if let Err(e) = self
+                .client
+                .download_file(&remote_src, &local_dst, true)
+                .await
+            {
                 eprintln!("{} {}", "Download failed:".red().bold(), e);
             } else {
                 println!("{} Download complete.", "✓".green().bold());
@@ -504,11 +604,27 @@ impl ReplSession {
             println!("Tenant ID:     {}", conf.get_tenant_id().bright_green());
             println!(
                 "Chunk Size:    {} MB",
-                conf.chunk_size_mb.unwrap_or(crate::config::DEFAULT_CHUNK_SIZE_MB).to_string().bright_yellow()
+                conf.chunk_size_mb
+                    .unwrap_or(crate::config::DEFAULT_CHUNK_SIZE_MB)
+                    .to_string()
+                    .bright_yellow()
             );
-            println!("IP Preference: {}", conf.ip_preference.as_deref().unwrap_or("auto").cyan());
-            println!("Threads:       {}", conf.get_threads().to_string().bright_yellow());
-            println!("Logged In:     {}", if conf.access_token.is_some() { "Yes".green() } else { "No".red() });
+            println!(
+                "IP Preference: {}",
+                conf.ip_preference.as_deref().unwrap_or("auto").cyan()
+            );
+            println!(
+                "Threads:       {}",
+                conf.get_threads().to_string().bright_yellow()
+            );
+            println!(
+                "Logged In:     {}",
+                if conf.access_token.is_some() {
+                    "Yes".green()
+                } else {
+                    "No".red()
+                }
+            );
             if let Some(ref email) = conf.user_principal_name {
                 println!("Account:       {}", email.cyan());
             }
@@ -577,8 +693,14 @@ impl ReplSession {
             let conf = self.config.lock().await;
             match args[1].to_lowercase().as_str() {
                 "threads" | "concurrency" | "jobs" => println!("{}", conf.get_threads()),
-                "ip_preference" | "ip_version" | "ip" => println!("{}", conf.ip_preference.as_deref().unwrap_or("auto")),
-                "chunk_size_mb" => println!("{}", conf.chunk_size_mb.unwrap_or(crate::config::DEFAULT_CHUNK_SIZE_MB)),
+                "ip_preference" | "ip_version" | "ip" => {
+                    println!("{}", conf.ip_preference.as_deref().unwrap_or("auto"))
+                }
+                "chunk_size_mb" => println!(
+                    "{}",
+                    conf.chunk_size_mb
+                        .unwrap_or(crate::config::DEFAULT_CHUNK_SIZE_MB)
+                ),
                 "client_id" => println!("{}", conf.get_client_id()),
                 "tenant_id" => println!("{}", conf.get_tenant_id()),
                 other => eprintln!("Unknown configuration key: {}", other.red()),
@@ -588,12 +710,19 @@ impl ReplSession {
                 println!("{}", path.display());
             }
         } else {
-            println!("{}", "Usage: config [show | get <key> | set <key> <value> | path]".yellow());
+            println!(
+                "{}",
+                "Usage: config [show | get <key> | set <key> <value> | path]".yellow()
+            );
         }
     }
 
     async fn handle_tasks(&self, args: &[String]) {
-        let action = if args.is_empty() { "list" } else { args[0].as_str() };
+        let action = if args.is_empty() {
+            "list"
+        } else {
+            args[0].as_str()
+        };
         match action {
             "list" | "ls" | "show" => {
                 let store = crate::tasks::TaskStore::load();
@@ -602,7 +731,11 @@ impl ReplSession {
             }
             "resume" => {
                 let store = crate::tasks::TaskStore::load();
-                let target_id = if args.len() > 1 { Some(args[1].as_str()) } else { None };
+                let target_id = if args.len() > 1 {
+                    Some(args[1].as_str())
+                } else {
+                    None
+                };
                 let tasks_to_resume: Vec<crate::tasks::TransferTask> = match target_id {
                     Some("all") | None => store.list_resumable(),
                     Some(id_str) => {
@@ -636,7 +769,11 @@ impl ReplSession {
                     if let Err(e) = self.client.resume_task(&task).await {
                         eprintln!("{} Task [{}] failed: {}", "Error:".red(), task.id, e);
                     } else {
-                        println!("{} Task [{}] completed successfully!", "✓".green().bold(), task.id);
+                        println!(
+                            "{} Task [{}] completed successfully!",
+                            "✓".green().bold(),
+                            task.id
+                        );
                     }
                 }
             }
@@ -664,33 +801,84 @@ impl ReplSession {
                 println!("{} Cleaned up all completed tasks.", "✓".green().bold());
             }
             _ => {
-                println!("{}", "Usage: tasks [list | resume [id|all] | rm <id> | clean | clear]".yellow());
+                println!(
+                    "{}",
+                    "Usage: tasks [list | resume [id|all] | rm <id> | clean | clear]".yellow()
+                );
             }
         }
     }
 
     fn print_help(&self) {
         println!("{}", "Available Interactive Commands:".cyan().bold());
-        println!("  {:<26} List files and folders in directory", "ls [-l] [-r] [path]".bright_yellow());
-        println!("  {:<26} Change current working directory", "cd <path>".bright_yellow());
-        println!("  {:<26} Print current working directory", "pwd".bright_yellow());
-        println!("  {:<26} Create a folder (-p for recursive)", "mkdir <folder> [-p]".bright_yellow());
-        println!("  {:<26} Print file contents to stdout", "cat <file>".bright_yellow());
-        println!("  {:<26} Upload file or folder (put)", "upload <local> [remote] [-r]".bright_yellow());
-        println!("  {:<26} Download file or folder (get)", "download <remote> [local] [-r]".bright_yellow());
-        println!("  {:<26} Manage transfer tasks & queue", "tasks [list|resume|rm|clean]".bright_yellow());
-        println!("  {:<26} Delete a file or folder", "rm <path>".bright_yellow());
-        println!("  {:<26} Move or rename file/folder", "mv <src> <tgt>".bright_yellow());
-        println!("  {:<26} Copy file/folder", "cp <src> <tgt>".bright_yellow());
-        println!("  {:<26} View item metadata or drive quota", "info [path]".bright_yellow());
+        println!(
+            "  {:<26} List files and folders in directory",
+            "ls [-l] [-r] [path]".bright_yellow()
+        );
+        println!(
+            "  {:<26} Change current working directory",
+            "cd <path>".bright_yellow()
+        );
+        println!(
+            "  {:<26} Print current working directory",
+            "pwd".bright_yellow()
+        );
+        println!(
+            "  {:<26} Create a folder (-p for recursive)",
+            "mkdir <folder> [-p]".bright_yellow()
+        );
+        println!(
+            "  {:<26} Print file contents to stdout",
+            "cat <file>".bright_yellow()
+        );
+        println!(
+            "  {:<26} Upload file or folder (put)",
+            "upload <local> [remote] [-r]".bright_yellow()
+        );
+        println!(
+            "  {:<26} Download file or folder (get)",
+            "download <remote> [local] [-r]".bright_yellow()
+        );
+        println!(
+            "  {:<26} Manage transfer tasks & queue",
+            "tasks [list|resume|rm|clean]".bright_yellow()
+        );
+        println!(
+            "  {:<26} Delete a file or folder",
+            "rm <path>".bright_yellow()
+        );
+        println!(
+            "  {:<26} Move or rename file/folder",
+            "mv <src> <tgt>".bright_yellow()
+        );
+        println!(
+            "  {:<26} Copy file/folder",
+            "cp <src> <tgt>".bright_yellow()
+        );
+        println!(
+            "  {:<26} View item metadata or drive quota",
+            "info [path]".bright_yellow()
+        );
         println!("  {:<26} View drive storage quota", "quota".bright_yellow());
-        println!("  {:<26} Search files across OneDrive", "search <keyword>".bright_yellow());
-        println!("  {:<26} Create shareable link", "share <path> [-t view|edit]".bright_yellow());
-        println!("  {:<26} View or update config", "config [set|get|show]".bright_yellow());
+        println!(
+            "  {:<26} Search files across OneDrive",
+            "search <keyword>".bright_yellow()
+        );
+        println!(
+            "  {:<26} Create shareable link",
+            "share <path> [-t view|edit]".bright_yellow()
+        );
+        println!(
+            "  {:<26} View or update config",
+            "config [set|get|show]".bright_yellow()
+        );
         println!("  {:<26} Show current user info", "whoami".bright_yellow());
         println!("  {:<26} Clear screen", "clear".bright_yellow());
         println!("  {:<26} Show this help", "help".bright_yellow());
-        println!("  {:<26} Exit interactive shell", "exit / quit".bright_yellow());
+        println!(
+            "  {:<26} Exit interactive shell",
+            "exit / quit".bright_yellow()
+        );
     }
 }
 
@@ -719,7 +907,9 @@ mod tests {
         assert_eq!(session.resolve_path("report.pdf"), "/documents/report.pdf");
         assert_eq!(session.resolve_path(".."), "/");
         assert_eq!(session.resolve_path("/root_folder"), "/root_folder");
-        assert_eq!(session.resolve_path("sub/file.txt"), "/documents/sub/file.txt");
+        assert_eq!(
+            session.resolve_path("sub/file.txt"),
+            "/documents/sub/file.txt"
+        );
     }
 }
-

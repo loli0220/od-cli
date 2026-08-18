@@ -118,7 +118,10 @@ pub struct CreateUploadSessionRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateUploadSessionItem {
-    #[serde(rename = "@microsoft.graph.conflictBehavior", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "@microsoft.graph.conflictBehavior",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub conflict_behavior: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -130,7 +133,10 @@ pub struct CreateUploadSessionItem {
 pub struct CreateFolderRequest {
     pub name: String,
     pub folder: serde_json::Value,
-    #[serde(rename = "@microsoft.graph.conflictBehavior", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "@microsoft.graph.conflictBehavior",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub conflict_behavior: Option<String>,
 }
 
