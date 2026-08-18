@@ -42,9 +42,24 @@
 
 ---
 
-## 🛠️ 安装与构建
+## 🛠️ 安装与下载
 
-### 1. 从源码编译
+### 1. 下载预编译二进制文件
+
+前往 [Releases 页面](../../releases) 直接下载对应平台和架构的免安装单文件执行包：
+
+| 平台 | 架构 | 二进制包文件名 |
+| :--- | :--- | :--- |
+| **Windows** | x64 (`x86_64`) | `od-cli-x86_64-pc-windows-msvc.zip` |
+| **Windows** | ARM64 (`aarch64`) | `od-cli-aarch64-pc-windows-msvc.zip` |
+| **macOS** | Apple Silicon (`M1/M2/M3/M4`) | `od-cli-aarch64-apple-darwin.tar.gz` |
+| **macOS** | Intel x64 (`x86_64`) | `od-cli-x86_64-apple-darwin.tar.gz` |
+| **Linux** | x64 (`glibc / musl 静态`) | `od-cli-x86_64-unknown-linux-gnu.tar.gz` / `musl` |
+| **Linux** | ARM64 (`glibc / musl 静态`) | `od-cli-aarch64-unknown-linux-gnu.tar.gz` / `musl` |
+| **Android / Termux** | ARM64 (`aarch64`) | `od-cli-aarch64-linux-android.tar.gz` |
+| **Android** | x64 (`x86_64`) | `od-cli-x86_64-linux-android.tar.gz` |
+
+### 2. 从源码编译
 
 确保已安装 [Rust & Cargo](https://rustup.rs/)（建议 1.75+）：
 
