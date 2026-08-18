@@ -256,9 +256,12 @@ impl ReplSession {
                         }
                         "whoami" | "status" => {
                             let conf = self.config.lock().await;
-                            println!("Logged in user: {}", conf.user_principal_name.as_deref().unwrap_or("Unknown").bright_green());
+                            println!("User Principal: {}", conf.user_principal_name.as_deref().unwrap_or("Unknown").bright_green());
                             println!("Display Name:   {}", conf.display_name.as_deref().unwrap_or("Unknown").yellow());
                             println!("Tenant ID:      {}", conf.get_tenant_id().dimmed());
+                        }
+                        "config" => {
+                            self.handle_config(rest).await;
                         }
                         "help" | "?" => {
                             self.print_help();
@@ -416,15 +419,20 @@ impl ReplSession {
             self.current_dir.clone()
         };
 
+        let threads = {
+            let conf = self.config.lock().await;
+            conf.get_threads()
+        };
+
         if local_p.is_dir() || recursive {
-            println!("Uploading local directory {:?} to remote '{}'...", local_p, remote_target);
-            if let Err(e) = self.client.upload_directory(local_p, &remote_target).await {
+            println!("Uploading local directory {:?} to remote '{}' with {} threads...", local_p, remote_target, threads);
+            if let Err(e) = self.client.upload_directory(local_p, &remote_target, threads).await {
                 eprintln!("{} {}", "Upload failed:".red().bold(), e);
             } else {
                 println!("{} Directory upload complete!", "✓".green().bold());
             }
         } else {
-            match self.client.upload_file(local_p, &remote_target, true).await {
+            match self.client.upload_file(local_p, &remote_target, true, threads).await {
                 Ok(item) => println!("{} Uploaded '{}' successfully.", "✓".green().bold(), item.name.cyan()),
                 Err(e) => eprintln!("{} {}", "Upload failed:".red().bold(), e),
             }
@@ -461,10 +469,14 @@ impl ReplSession {
         };
 
         let is_dir_check = self.client.get_item(&remote_src).await.map(|i| i.is_dir()).unwrap_or(false);
+        let threads = {
+            let conf = self.config.lock().await;
+            conf.get_threads()
+        };
 
         if is_dir_check || recursive {
-            println!("Downloading remote folder '{}' to {:?}...", remote_src, local_dst);
-            if let Err(e) = self.client.download_directory(&remote_src, &local_dst).await {
+            println!("Downloading remote folder '{}' to {:?} with {} threads...", remote_src, local_dst, threads);
+            if let Err(e) = self.client.download_directory(&remote_src, &local_dst, threads).await {
                 eprintln!("{} {}", "Download failed:".red().bold(), e);
             } else {
                 println!("{} Directory download complete!", "✓".green().bold());
@@ -475,6 +487,105 @@ impl ReplSession {
             } else {
                 println!("{} Download complete.", "✓".green().bold());
             }
+        }
+    }
+
+    async fn handle_config(&self, args: &[String]) {
+        if args.is_empty() || args[0] == "show" || args[0] == "list" {
+            let conf = self.config.lock().await;
+            println!("{}", "=== od-cli Configuration ===".bold().cyan());
+            if let Ok(path) = Config::config_path() {
+                println!("Config Path:   {}", path.display().to_string().dimmed());
+            }
+            println!("Client ID:     {}", conf.get_client_id().bright_green());
+            println!("Tenant ID:     {}", conf.get_tenant_id().bright_green());
+            println!(
+                "Chunk Size:    {} MB",
+                conf.chunk_size_mb.unwrap_or(crate::config::DEFAULT_CHUNK_SIZE_MB).to_string().bright_yellow()
+            );
+            println!("IP Preference: {}", conf.ip_preference.as_deref().unwrap_or("auto").cyan());
+            println!("Threads:       {}", conf.get_threads().to_string().bright_yellow());
+            println!("Logged In:     {}", if conf.access_token.is_some() { "Yes".green() } else { "No".red() });
+            if let Some(ref email) = conf.user_principal_name {
+                println!("Account:       {}", email.cyan());
+            }
+        } else if args[0] == "set" {
+            if args.len() < 3 {
+                println!("{}", "Usage: config set <key> <value>".yellow());
+                println!("Valid keys: threads, ip_preference, chunk_size_mb, client_id, tenant_id");
+                return;
+            }
+            let key = &args[1];
+            let value = &args[2];
+            let mut conf = self.config.lock().await;
+            match key.to_lowercase().as_str() {
+                "threads" | "concurrency" | "jobs" => {
+                    if let Ok(th) = value.parse::<usize>() {
+                        conf.threads = Some(th.max(1));
+                        println!("Set {} = {}", "threads".cyan(), th.max(1));
+                    } else {
+                        eprintln!("{} Invalid integer for threads", "Error:".red());
+                        return;
+                    }
+                }
+                "ip_preference" | "ip_version" | "ip" => {
+                    let val = match value.to_lowercase().as_str() {
+                        "ipv4" | "v4" | "4" => "ipv4",
+                        "ipv6" | "v6" | "6" => "ipv6",
+                        _ => "auto",
+                    };
+                    conf.ip_preference = Some(val.to_string());
+                    println!("Set {} = {}", "ip_preference".cyan(), val);
+                }
+                "chunk_size_mb" => {
+                    if let Ok(mb) = value.parse::<usize>() {
+                        conf.chunk_size_mb = Some(mb);
+                        println!("Set {} = {} MB", "chunk_size_mb".cyan(), mb);
+                    } else {
+                        eprintln!("{} Invalid number for chunk_size_mb", "Error:".red());
+                        return;
+                    }
+                }
+                "client_id" => {
+                    conf.client_id = Some(value.clone());
+                    println!("Set {} = {}", "client_id".cyan(), value);
+                }
+                "tenant_id" => {
+                    conf.tenant_id = Some(value.clone());
+                    println!("Set {} = {}", "tenant_id".cyan(), value);
+                }
+                other => {
+                    eprintln!(
+                        "{} Unknown key '{}'. Valid keys: threads, ip_preference, chunk_size_mb, client_id, tenant_id",
+                        "Error:".red(),
+                        other
+                    );
+                    return;
+                }
+            }
+            if let Err(e) = conf.save() {
+                eprintln!("{} Failed to save config: {}", "Error:".red(), e);
+            }
+        } else if args[0] == "get" {
+            if args.len() < 2 {
+                println!("{}", "Usage: config get <key>".yellow());
+                return;
+            }
+            let conf = self.config.lock().await;
+            match args[1].to_lowercase().as_str() {
+                "threads" | "concurrency" | "jobs" => println!("{}", conf.get_threads()),
+                "ip_preference" | "ip_version" | "ip" => println!("{}", conf.ip_preference.as_deref().unwrap_or("auto")),
+                "chunk_size_mb" => println!("{}", conf.chunk_size_mb.unwrap_or(crate::config::DEFAULT_CHUNK_SIZE_MB)),
+                "client_id" => println!("{}", conf.get_client_id()),
+                "tenant_id" => println!("{}", conf.get_tenant_id()),
+                other => eprintln!("Unknown configuration key: {}", other.red()),
+            }
+        } else if args[0] == "path" {
+            if let Ok(path) = Config::config_path() {
+                println!("{}", path.display());
+            }
+        } else {
+            println!("{}", "Usage: config [show | get <key> | set <key> <value> | path]".yellow());
         }
     }
 
@@ -494,6 +605,7 @@ impl ReplSession {
         println!("  {:<26} View drive storage quota", "quota".bright_yellow());
         println!("  {:<26} Search files across OneDrive", "search <keyword>".bright_yellow());
         println!("  {:<26} Create shareable link", "share <path> [-t view|edit]".bright_yellow());
+        println!("  {:<26} View or update config", "config [set|get|show]".bright_yellow());
         println!("  {:<26} Show current user info", "whoami".bright_yellow());
         println!("  {:<26} Clear screen", "clear".bright_yellow());
         println!("  {:<26} Show this help", "help".bright_yellow());
@@ -510,8 +622,9 @@ mod tests {
     fn test_resolve_path_cases() {
         // We can test resolve_path logic directly by instantiating ReplSession with mock objects or constructing
         let client = Arc::new(OneDriveClient::new(
-            Arc::new(AuthManager::new()),
+            Arc::new(AuthManager::new(None)),
             Arc::new(Mutex::new(Config::default())),
+            None,
         ));
         let config = Arc::new(Mutex::new(Config::default()));
 

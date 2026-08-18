@@ -31,6 +31,8 @@ pub struct TokenResponse {
     pub refresh_token: Option<String>,
 }
 
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
 #[derive(Debug, Deserialize)]
 struct ErrorResponse {
     error: String,
@@ -42,12 +44,21 @@ pub struct AuthManager {
 }
 
 impl AuthManager {
-    pub fn new() -> Self {
+    pub fn new(ip_preference: Option<&str>) -> Self {
+        let mut builder = Client::builder().timeout(Duration::from_secs(30));
+        if let Some(pref) = ip_preference {
+            match pref.to_lowercase().as_str() {
+                "ipv4" | "v4" | "4" => {
+                    builder = builder.local_address(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+                }
+                "ipv6" | "v6" | "6" => {
+                    builder = builder.local_address(IpAddr::V6(Ipv6Addr::UNSPECIFIED));
+                }
+                _ => {}
+            }
+        }
         Self {
-            http: Client::builder()
-                .timeout(Duration::from_secs(30))
-                .build()
-                .unwrap_or_default(),
+            http: builder.build().unwrap_or_default(),
         }
     }
 

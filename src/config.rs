@@ -7,6 +7,7 @@ use std::path::PathBuf;
 pub const DEFAULT_CLIENT_ID: &str = "d3590ed6-52b3-4102-aeff-aad2292ab01c";
 pub const DEFAULT_TENANT_ID: &str = "common";
 pub const DEFAULT_CHUNK_SIZE_MB: usize = 10; // Must be multiple of 320 KiB for MS Graph
+pub const DEFAULT_THREADS: usize = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -18,6 +19,8 @@ pub struct Config {
     pub user_principal_name: Option<String>,
     pub display_name: Option<String>,
     pub chunk_size_mb: Option<usize>,
+    pub ip_preference: Option<String>,
+    pub threads: Option<usize>,
 }
 
 impl Default for Config {
@@ -31,6 +34,8 @@ impl Default for Config {
             user_principal_name: None,
             display_name: None,
             chunk_size_mb: Some(DEFAULT_CHUNK_SIZE_MB),
+            ip_preference: Some("auto".to_string()),
+            threads: Some(DEFAULT_THREADS),
         }
     }
 }
@@ -114,6 +119,14 @@ impl Config {
         let unit = 320 * 1024;
         let bytes = mb * 1024 * 1024;
         (bytes / unit) * unit
+    }
+
+    pub fn get_ip_preference(&self) -> Option<&str> {
+        self.ip_preference.as_deref()
+    }
+
+    pub fn get_threads(&self) -> usize {
+        self.threads.unwrap_or(DEFAULT_THREADS).max(1)
     }
 }
 

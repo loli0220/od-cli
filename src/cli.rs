@@ -9,6 +9,18 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
     long_about = "od-cli is a powerful command-line interface for Microsoft OneDrive.\nRun commands directly or start an interactive shell by running `od-cli` without arguments."
 )]
 pub struct Cli {
+    /// Force IPv4 network resolution
+    #[arg(short = '4', long = "ipv4", global = true)]
+    pub ipv4: bool,
+
+    /// Force IPv6 network resolution
+    #[arg(short = '6', long = "ipv6", global = true)]
+    pub ipv6: bool,
+
+    /// Number of concurrent worker threads for upload/download
+    #[arg(short = 'j', long = "threads", global = true)]
+    pub threads: Option<usize>,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -164,6 +176,10 @@ pub struct UploadArgs {
     /// Recursively upload directory
     #[arg(short = 'r', long)]
     pub recursive: bool,
+
+    /// Concurrency worker threads for upload
+    #[arg(short = 'j', long = "threads")]
+    pub threads: Option<usize>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -178,6 +194,10 @@ pub struct DownloadArgs {
     /// Recursively download directory
     #[arg(short = 'r', long)]
     pub recursive: bool,
+
+    /// Concurrency worker threads for download
+    #[arg(short = 'j', long = "threads")]
+    pub threads: Option<usize>,
 }
 
 #[derive(Args, Debug, Clone)]

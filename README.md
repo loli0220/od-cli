@@ -16,10 +16,18 @@
   - 终端输出验证码并可自动唤起浏览器登录，无需本地监听特定端口。
   - 支持个人 Microsoft 账户以及企业/学校 Office 365 组织账户（多租户支持）。
   - 本地安全持久化 Token，并在过期时自动无感刷新（Refresh Token）。
+- ⚡ **断点续传与并发加速**：
+  - **上传断点续传**：大文件上传会自动记录本地 Upload Session，中途断网或退出后，重新执行命令将自动恢复断点，无需从头重传。
+  - **下载断点续传**：基于 `.part` 临时文件与 HTTP `Range` 范围请求，中断后重新下载自动继续未完成的部分。
+  - **多 Range 单文件并发上传**：超大文件分块切片后支持多线程并发 PUT 上传，跑满带宽。
+  - **多文件并发传输**：递归上传/下载目录时，支持 `-j / --threads <N>` 多个文件同时并行传输。
+- 🌐 **IPv4 / IPv6 灵活指定**：
+  - 支持命令行参数 `-4 / --ipv4` 和 `-6 / --ipv6` 强制网络协议族。
+  - 支持持久化写入配置文件：`od-cli config set ip_preference ipv4`。
 - 📦 **完整的文件与目录操作**：
   - **目录浏览** (`ls` / `list`)：精美 Unicode 表格、详细信息（`-l`）、递归（`-r`）、JSON 格式输出。
-  - **分块大文件上传** (`upload` / `put`)：小文件直接上传，大文件（>4MB）通过 Microsoft Graph Upload Session 自动分块切片并附带实时进度条。
-  - **流式文件下载** (`download` / `get`)：支持单文件与整目录递归下载，配有动态进度条。
+  - **大文件上传** (`upload` / `put`)：小文件直接上传，大文件（>4MB）切片并发上传带实时进度条。
+  - **流式文件下载** (`download` / `get`)：支持单文件与整目录递归多线程下载，配有动态进度条。
   - **终端直读** (`cat`)：流式输出远程文本内容到标准输出，可用于 Unix 管道。
   - **目录管理** (`mkdir`)：支持 `-p` 递归级联创建多级目录。
   - **移动/重命名与复制** (`mv`, `cp`)：支持远程移动、重命名及异步复制。
@@ -138,26 +146,29 @@ od-cli ls /photos --json
 
 ### 2. 上传文件与目录 (`upload` / `put`)
 ```bash
-# 上传单个文件（自动根据大小选择直传或分块切片上传，带进度条）
+# 上传单个文件（自动根据大小选择直传或分块切片并发上传，支持中断后自动续传）
 od-cli upload ./presentation.pptx /documents/presentation.pptx
 
-# 上传并使用相同文件名
-od-cli upload ./video.mp4 /videos/
+# 指定并发线程数（多 Range 并发切片上传，速度更快）
+od-cli upload ./video.mp4 /videos/ -j 8
 
-# 递归上传整个本地文件夹
-od-cli upload -r ./my_folder /remote_folder
+# 强制使用 IPv4 或 IPv6 网络传输
+od-cli upload -4 ./backup.tar.gz /backups/
+
+# 递归多线程并发上传整个本地文件夹
+od-cli upload -r ./my_folder /remote_folder -j 4
 ```
 
 ### 3. 下载文件与目录 (`download` / `get`)
 ```bash
-# 下载单个文件到当前目录
+# 下载单个文件到当前目录（自动支持断点续传，中断后重新下载自动继续未完成部分）
 od-cli download /documents/contract.pdf .
 
 # 下载单个文件并重命名
 od-cli download /documents/contract.pdf ./my_contract.pdf
 
-# 递归下载整个远程文件夹
-od-cli download -r /remote_folder ./local_folder
+# 递归多线程并发下载整个远程文件夹
+od-cli download -r /remote_folder ./local_folder -j 8
 ```
 
 ### 4. 查看文件内容 (`cat`)
@@ -279,6 +290,7 @@ Goodbye!
 | `quota` | 查看网盘存储配额 |
 | `search <query>` | 全局搜索文件 |
 | `share <path>` | 生成分享链接 |
+| `config [show\|set\|get]` | 查看或修改全局配置（线程数、IP偏好等） |
 | `whoami` | 显示当前登录用户信息 |
 | `clear` | 清屏 |
 | `help` | 查看帮助手册 |
@@ -296,9 +308,20 @@ Goodbye!
 
 可通过 `od-cli config` 命令快速管理：
 ```bash
+# 查看所有当前配置（Client ID, 租户, 切片大小, 默认线程数, 网络协议族等）
 od-cli config show
-od-cli config path
+
+# 配置默认并发线程数（如 8 线程）
+od-cli config set threads 8
+
+# 配置网络协议族偏好（ipv4 / ipv6 / auto）
+od-cli config set ip_preference ipv4
+
+# 配置单切片大小（MB，自动对齐 320 KiB）
 od-cli config set chunk_size_mb 20
+
+# 查看配置文件的实际存储路径
+od-cli config path
 ```
 
 ---

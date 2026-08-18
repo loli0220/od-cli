@@ -3,6 +3,7 @@ mod cli;
 mod client;
 mod config;
 mod repl;
+mod sessions;
 mod types;
 mod ui;
 
@@ -19,11 +20,22 @@ use tokio::sync::Mutex;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let config = Arc::new(Mutex::new(Config::load()?));
-    let auth_manager = Arc::new(auth::AuthManager::new());
+    let config_val = Config::load()?;
+    let default_threads = config_val.get_threads();
+    let ip_pref_override = if cli.ipv4 {
+        Some("ipv4".to_string())
+    } else if cli.ipv6 {
+        Some("ipv6".to_string())
+    } else {
+        config_val.get_ip_preference().map(|s| s.to_string())
+    };
+
+    let config = Arc::new(Mutex::new(config_val));
+    let auth_manager = Arc::new(auth::AuthManager::new(ip_pref_override.as_deref()));
     let client = Arc::new(client::OneDriveClient::new(
         auth_manager.clone(),
         config.clone(),
+        ip_pref_override.as_deref(),
     ));
 
     match cli.command {
@@ -83,9 +95,23 @@ async fn main() -> Result<()> {
                         conf.chunk_size_mb = Some(mb);
                         println!("Set {} = {} MB", "chunk_size_mb".cyan(), mb);
                     }
+                    "ip_preference" | "ip_version" | "ip" => {
+                        let val = match value.to_lowercase().as_str() {
+                            "ipv4" | "v4" | "4" => "ipv4",
+                            "ipv6" | "v6" | "6" => "ipv6",
+                            _ => "auto",
+                        };
+                        conf.ip_preference = Some(val.to_string());
+                        println!("Set {} = {}", "ip_preference".cyan(), val);
+                    }
+                    "threads" | "concurrency" | "jobs" => {
+                        let th: usize = value.parse().map_err(|_| anyhow::anyhow!("Invalid number for threads"))?;
+                        conf.threads = Some(th.max(1));
+                        println!("Set {} = {}", "threads".cyan(), th.max(1));
+                    }
                     other => {
                         eprintln!(
-                            "{} Unknown configuration key '{}'. Valid keys: client_id, tenant_id, chunk_size_mb",
+                            "{} Unknown configuration key '{}'. Valid keys: client_id, tenant_id, chunk_size_mb, ip_preference, threads",
                             "Error:".red(),
                             other
                         );
@@ -100,6 +126,8 @@ async fn main() -> Result<()> {
                     "client_id" => println!("{}", conf.get_client_id()),
                     "tenant_id" => println!("{}", conf.get_tenant_id()),
                     "chunk_size_mb" => println!("{}", conf.chunk_size_mb.unwrap_or(config::DEFAULT_CHUNK_SIZE_MB)),
+                    "ip_preference" | "ip_version" | "ip" => println!("{}", conf.ip_preference.as_deref().unwrap_or("auto")),
+                    "threads" | "concurrency" | "jobs" => println!("{}", conf.get_threads()),
                     other => {
                         eprintln!("Unknown configuration key: {}", other.red());
                     }
@@ -115,6 +143,8 @@ async fn main() -> Result<()> {
                     "Chunk Size:    {} MB",
                     conf.chunk_size_mb.unwrap_or(config::DEFAULT_CHUNK_SIZE_MB).to_string().bright_yellow()
                 );
+                println!("IP Preference: {}", conf.ip_preference.as_deref().unwrap_or("auto").cyan());
+                println!("Threads:       {}", conf.get_threads().to_string().bright_yellow());
                 println!("Logged In:     {}", if conf.access_token.is_some() { "Yes".green() } else { "No".red() });
                 if let Some(ref email) = conf.user_principal_name {
                     println!("Account:       {}", email.cyan());
@@ -168,13 +198,14 @@ async fn main() -> Result<()> {
         Some(Commands::Upload(args)) => {
             let local_p = Path::new(&args.local_path);
             let remote_dest = args.remote_path.as_deref().unwrap_or("");
+            let threads = args.threads.or(cli.threads).unwrap_or(default_threads);
 
             if local_p.is_dir() || args.recursive {
-                println!("Uploading directory {:?} -> '{}'...", local_p, remote_dest);
-                client.upload_directory(local_p, remote_dest).await?;
+                println!("Uploading directory {:?} -> '{}' (threads: {})...", local_p, remote_dest, threads);
+                client.upload_directory(local_p, remote_dest, threads).await?;
                 println!("{} Directory upload complete!", "✓".green().bold());
             } else {
-                let item = client.upload_file(local_p, remote_dest, true).await?;
+                let item = client.upload_file(local_p, remote_dest, true, threads).await?;
                 println!("{} Uploaded '{}' (Size: {})", "✓".green().bold(), item.name.cyan(), ui::format_size(item.size.unwrap_or(0)));
             }
         }
@@ -182,10 +213,11 @@ async fn main() -> Result<()> {
         Some(Commands::Download(args)) => {
             let local_dst = PathBuf::from(&args.local_path);
             let is_dir = client.get_item(&args.remote_path).await.map(|i| i.is_dir()).unwrap_or(false);
+            let threads = args.threads.or(cli.threads).unwrap_or(default_threads);
 
             if is_dir || args.recursive {
-                println!("Downloading directory '{}' -> {:?}...", args.remote_path, local_dst);
-                client.download_directory(&args.remote_path, &local_dst).await?;
+                println!("Downloading directory '{}' -> {:?} (threads: {})...", args.remote_path, local_dst, threads);
+                client.download_directory(&args.remote_path, &local_dst, threads).await?;
                 println!("{} Directory download complete!", "✓".green().bold());
             } else {
                 client.download_file(&args.remote_path, &local_dst, true).await?;
