@@ -80,15 +80,7 @@ impl ReplSession {
                     .unwrap_or_else(|| "guest".to_string())
             };
 
-            let prompt = format!(
-                "{}{}{}{}{}{} ",
-                "od-cli [".cyan().bold(),
-                user_info.yellow(),
-                ":".cyan(),
-                self.current_dir.bright_green().bold(),
-                "]".cyan().bold(),
-                ">".bright_white().bold()
-            );
+            let prompt = format!("od-cli [{}:{}]> ", user_info, self.current_dir);
 
             let readline = rl.readline(&prompt);
             match readline {
