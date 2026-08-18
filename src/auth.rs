@@ -153,11 +153,20 @@ impl AuthManager {
                             bail!("Sign-in authorization was declined.");
                         }
                         other => {
-                            bail!(
-                                "Authentication failed ({}): {}",
-                                other,
-                                err_data.error_description.unwrap_or_default()
-                            );
+                            let desc = err_data.error_description.unwrap_or_default();
+                            if desc.contains("AADSTS65002") {
+                                bail!(
+                                    "Azure AD rejected the Client ID (AADSTS65002: first-party app consent restricted).\n\n\
+                                    💡 Solution: Please register your own free Azure App in Azure Portal:\n\
+                                    1. Open https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade\n\
+                                    2. Click 'New registration', name it 'od-cli', select 'Accounts in any organizational directory and personal Microsoft accounts'\n\
+                                    3. In Authentication -> Advanced settings -> set 'Allow public client flows' to 'Yes'\n\
+                                    4. In API permissions -> Add 'Files.ReadWrite.All', 'offline_access', 'User.Read' (Delegated permissions)\n\
+                                    5. Run `od-cli config set client_id <YOUR_CLIENT_ID>` and then `od-cli auth login`"
+                                );
+                            } else {
+                                bail!("Authentication failed ({}): {}", other, desc);
+                            }
                         }
                     }
                 } else {

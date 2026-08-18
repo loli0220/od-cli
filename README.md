@@ -46,11 +46,49 @@ cargo build --release
 
 ---
 
-## 🔑 认证与配置
+## 🔑 认证与 Azure App (Client ID) 配置
 
-### 1. 登录认证
+由于微软近期对第一方应用授权策略的收紧（直接使用公共第一方 ID 会触发 `AADSTS65002` 错误），**强烈建议您在 Azure Portal 中注册属于您自己的免费 Azure App**（完全免费，仅需 1~2 分钟）。
 
-首次使用只需运行登录命令：
+> 📖 详细图文与常见问题排查请参见独立文档：[AZURE_APP_SETUP.md](./AZURE_APP_SETUP.md)
+
+---
+
+### 1. 创建属于您自己的 Client ID（只需 4 步）
+
+1. **新建应用注册**：
+   - 登录 [Azure Portal - 应用注册 (App registrations)](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)。
+   - 点击 **“+ 新注册” (New registration)**：
+     - **名称**：`od-cli`（或自定义名称）
+     - **受支持的账户类型**：选择 **“任何组织目录中的账户和个人 Microsoft 账户 (例如 Skype、Xbox)”** *(Accounts in any organizational directory and personal Microsoft accounts)*
+     - **重定向 URI**：平台选 **“公共客户端/移动和桌面应用程序 (Public client/native)”**，填入 `https://login.microsoftonline.com/common/oauth2/nativeclient`
+   - 点击 **“注册”**。
+
+2. **开启公共客户端流（关键 ⚠️）**：
+   - 进入创建的应用 -> 点击左侧 **“身份验证” (Authentication)**。
+   - 滚动到下方 **“高级设置”** -> **“允许公共客户端流” (Allow public client flows)**。
+   - 将 **“启用以下移动和桌面流”** 设置为 **“是 (Yes)”** 并点击顶部的 **“保存”**。
+
+3. **添加 Microsoft Graph API 权限**：
+   - 点击左侧 **“API 权限” (API permissions)** -> **“+ 添加权限”** -> 选择 **“Microsoft Graph”** -> **“委托的权限” (Delegated permissions)**。
+   - 勾选以下 3 项必要权限：
+     - `Files.ReadWrite.All`（读写所有 OneDrive 文件）
+     - `offline_access`（获取 Refresh Token 保持长期免登录）
+     - `User.Read`（获取登录账号信息）
+   - 点击 **“添加权限”** 保存。
+
+4. **将 Client ID 配置到 `od-cli`**：
+   - 在应用的 **“概述” (Overview)** 页面，复制 **“应用程序(客户端) ID”**。
+   - 在终端运行命令保存配置：
+     ```bash
+     od-cli config set client_id <粘贴您的应用程序客户端ID>
+     ```
+
+---
+
+### 2. 登录与登出
+
+完成上述 Client ID 配置后，运行设备码登录：
 
 ```bash
 od-cli auth login
@@ -67,7 +105,7 @@ od-cli auth login
 ```
 浏览器会自动打开（或手动访问该链接），输入验证码并授权即可完成登录。
 
-查看当前登录状态：
+查看当前登录状态与配额：
 ```bash
 od-cli auth status
 # 或
@@ -78,26 +116,6 @@ od-cli auth whoami
 ```bash
 od-cli auth logout
 ```
-
-### 2. 自定义 Azure App Registration（可选）
-
-默认情况下，`od-cli` 内置了通用公共客户端 ID，可以直接登录使用。如果您希望在自己的 Azure 租户中注册专用应用：
-
-1. 登录 [Azure Portal (应用注册 App registrations)](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)。
-2. 点击 **新注册 (New registration)**：
-   - 名称：`od-cli`
-   - 支持的账户类型：*任何组织目录中的账户和个人 Microsoft 账户 (例如 Skype、Xbox)*
-   - 重定向 URI：选择 **公共客户端/移动和桌面应用程序 (Public client/native)**，填入 `https://login.microsoftonline.com/common/oauth2/nativeclient`
-3. 进入注册的应用，在 **API 权限 (API permissions)** 中添加 **Microsoft Graph** 委托权限：
-   - `Files.ReadWrite.All`
-   - `offline_access`
-   - `User.Read`
-4. 在 **身份验证 (Authentication)** -> **高级设置** 中，将 **“允许公共客户端流” (Allow public client flows)** 设置为 **“是 (Yes)”**。
-5. 复制应用的 **应用程序(客户端) ID (Application (client) ID)**，在 CLI 中设置：
-   ```bash
-   od-cli config set client_id <YOUR_CLIENT_ID>
-   od-cli config set tenant_id common   # 或您的组织 tenant_id
-   ```
 
 ---
 
